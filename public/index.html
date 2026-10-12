@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Doodle Room</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    font-family: system-ui, -apple-system, sans-serif;
+    background: #f4f1ea;
+    color: #222;
+  }
+  button {
+    font: inherit;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 14px;
+    background: #3b6ea5;
+    color: #fff;
+    cursor: pointer;
+  }
+  button.secondary { background: #6b6b6b; }
+  button.danger { background: #c92a2a; }
+  button.small { padding: 6px 10px; font-size: 13px; }
+  input, select {
+    font: inherit;
+    font-size: 16px; /* 16px stops iPhone from zooming in on focus */
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #bbb;
+  }
+
+  /* Lobby */
+  #lobby {
+    height: 100%;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  #lobby h1 { margin: 0 0 16px; }
+  #lobby .box { display: flex; flex-direction: column; gap: 10px; width: min(320px, 92vw); }
+  #lobbyError { color: #c92a2a; min-height: 20px; text-align: center; font-size: 14px; }
+
+  /* Game screen. Its height is set by JavaScript to match the visible area,
+     so the on-screen keyboard never hides the drawing board. */
+  #game {
+    display: none;
+    flex-direction: column;
+    height: 100%;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  #header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: #fff;
+    border-bottom: 1px solid #ddd;
+  }
+  #info {
+    flex: 1;
+    min-width: 0;
+    font-weight: 600;
+    font-size: 15px;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #timer { min-width: 30px; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+  #ownerBar {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: #fff8e1;
+    font-size: 14px;
+  }
+  #guessForm {
+    display: flex;
+    gap: 6px;
+    padding: 8px;
+    background: #fff;
+  }
+  #guessInput { flex: 1; min-width: 0; }
+  #canvasWrap {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+  }
+  #board {
+    background: #fff;
+    border: 2px solid #333;
+    border-radius: 6px;
+    touch-action: none; /* stops the page scrolling while you draw */
+  }
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.4);
+  }
+  .panel {
+    background: #fff;
+    padding: 16px;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: min(320px, 90%);
+    max-height: 90%;
+    overflow: auto;
+  }
+  #tools {
+    display: none;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px;
+    background: #fff;
+    border-top: 1px solid #ddd;
+  }
+  .swatch {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 2px solid #999;
+    cursor: pointer;
+  }
+  .swatch.on { outline: 3px solid #3b6ea5; outline-offset: 1px; }
+  #players {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 6px 8px;
+    background: #fff;
+    border-top: 1px solid #ddd;
+  }
+  .chip {
+    flex: 0 0 auto;
+    padding: 4px 10px;
+    border-radius: 16px;
+    background: #eee;
+    font-size: 13px;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .chip.drawer { background: #ffd43b; }
+  .chip.offline { opacity: 0.45; }
+  .chip.me { font-weight: 700; }
+  #actions {
+    display: none;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    background: #fff;
+    font-size: 14px;
+  }
+  #log {
+    height: 90px;
+    overflow-y: auto;
+    padding: 4px 8px;
+    font-size: 14px;
+    background: #fff;
+    border-top: 1px solid #ddd;
+  }
+  #log .sys { color: #2f9e44; font-style: italic; }
+</style>
+</head>
+<body>
+
+<!-- LOBBY -->
+<div id="lobby">
+  <h1>Doodle Room</h1>
+  <div class="box">
+    <input id="name" placeholder="Your name" maxlength="16" />
+    <button id="createBtn">Create a room</button>
+    <input id="code" placeholder="Room code" maxlength="6" autocapitalize="characters" />
+    <button id="joinBtn" class="secondary">Join room</button>
+    <div id="lobbyError"></div>
+  </div>
+</div>
+
+<!-- GAME -->
+<div id="game">
+  <div id="header">
+    <div id="info">Connecting…</div>
+    <div id="timer"></div>
+    <button id="inviteBtn" class="secondary small">Invite</button>
+    <button id="leaveBtn" class="secondary small">Leave</button>
+  </div>
+
+  <div id="ownerBar">
+    <label>Rounds
+      <select id="rounds">
+        <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+      </select>
+    </label>
+    <button id="startBtn" class="small">Start game</button>
+  </div>
+
+  <form id="guessForm">
+    <input id="guessInput" placeholder="Type your guess here" maxlength="80" autocomplete="off" autocorrect="off" />
+    <button type="submit" class="small">Send</button>
+  </form>
+
+  <div id="canvasWrap">
+    <canvas id="board"></canvas>
+
+    <div id="chooser" class="overlay">
+      <div class="panel">
+        <b>Choose a word to draw</b>
+        <div id="chooserWords" style="display:flex;flex-direction:column;gap:6px"></div>
+      </div>
+    </div>
+
+    <div id="results" class="overlay">
+      <div class="panel">
+        <b>Final scores</b>
+        <div id="resultsList"></div>
+        <button id="closeResults" class="secondary small">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="tools">
+    <span id="swatches"></span>
+    <button class="small secondary" data-size="3">S</button>
+    <button class="small secondary" data-size="8">M</button>
+    <button class="small secondary" data-size="16">L</button>
+    <button id="clearBtn" class="small danger">Clear</button>
+  </div>
+
+  <div id="players"></div>
+  <div id="actions"></div>
+  <div id="log"></div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const socket = io();
+
+// Stable player identity, so a reconnect is recognized as the same player.
+let playerId = localStorage.getItem('doodle_pid');
+if (!playerId) {
+  playerId = (window.crypto && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2) + Date.now().toString(36);
+  localStorage.setItem('doodle_pid', playerId);
+}
+
+let roomCode = localStorage.getItem('doodle_room');
+let state = null;
+let myWord = null;
+let hint = '';
+let endsAt = 0;
+let selectedId = null;
+const muted = new Set();
+let color = '#111111';
+let brush = 8;
+let drawing = false;
+let last = null;
+
+// ---------- Lobby ----------
+const nameInput = $('name');
+nameInput.value = localStorage.getItem('doodle_name') || '';
+const codeInput = $('code');
+const urlRoom = new URLSearchParams(location.search).get('room');
+if (urlRoom) codeInput.value = urlRoom.toUpperCase();
+
+function showLobby(msg) {
+  $('game').style.display = 'none';
+  $('lobby').style.display = 'flex';
+  $('lobbyError').textContent = msg || '';
+}
+
+function showGame() {
+  $('lobby').style.display = 'none';
+  $('game').style.display = 'flex';
+  fitToViewport();
+}
+
+function join(create) {
+  const name = nameInput.value.trim().slice(0, 16) || 'Player';
+  localStorage.setItem('doodle_name', name);
+  const code = codeInput.value.trim().toUpperCase();
+  if (!create && !code) return $('lobbyError').textContent = 'Enter a room code, or create a new room.';
+  socket.emit('join', { create, code, playerId, name });
+}
+
+$('createBtn').onclick = () => join(true);
+$('joinBtn').onclick = () => join(false);
+codeInput.addEventListener('keydown', e => { if (e.key === 'Enter') join(false); });
+
+function leaveRoom() {
+  socket.emit('leave');
+  roomCode = null;
+  localStorage.removeItem('doodle_room');
+  history.replaceState(null, '', '/');
+  state = null;
+  showLobby('');
+}
+
+$('leaveBtn').onclick = leaveRoom;
+
+$('inviteBtn').onclick = async () => {
+  const link = location.origin + '/?room=' + roomCode;
+  try {
+    await navigator.clipboard.writeText(link);
+    addLog('Invite link copied. Send it to your friends.', 'sys');
+  } catch (e) {
+    addLog('Invite link: ' + link, 'sys');
+  }
+};
+
+// ---------- Connection and reconnect ----------
+socket.on('connect', () => {
+  // On first load or after any reconnect, rejoin the room we were in.
+  if (roomCode) {
+    socket.emit('join', {
+      create: false,
+      code: roomCode,
+      playerId,
+      name: localStorage.getItem('doodle_name') || 'Player',
+    });
+  }
+});
+
+socket.on('disconnect', () => {
+  if (state) $('info').textContent = 'Connection lost. Reconnecting…';
+});
+
+// When the phone brings the browser back to the front, reconnect right away.
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && !socket.connected) socket.connect();
+});
+
+socket.on('joined', d => {
+  roomCode = d.code;
+  localStorage.setItem('doodle_room', d.code);
+  history.replaceState(null, '', '/?room=' + d.code);
+  // Re-apply mutes on the server, since they were set in this browser.
+  muted.forEach(id => socket.emit('mute', { id, on: true }));
+  showGame();
+});
+
+socket.on('joinError', msg => {
+  roomCode = null;
+  localStorage.removeItem('doodle_room');
+  showLobby(msg);
+});
+
+socket.on('kicked', d => {
+  roomCode = null;
+  state = null;
+  localStorage.removeItem('doodle_room');
+  history.replaceState(null, '', '/');
+  showLobby(d.ban ? 'You were banned from that room.' : 'You were removed from the room.');
+});
+
+socket.on('notice', msg => addLog(msg, 'sys'));
+
+// ---------- Game events ----------
+socket.on('state', s => {
+  state = s;
+  endsAt = Date.now() + s.endsIn;
+  if (s.state !== 'choosing') $('chooser').style.display = 'none';
+  if (s.state !== 'over') $('results').style.display = 'none';
+  if (s.state === 'choosing' || s.state === 'lobby' || s.state === 'over') {
+    myWord = null;
+    hint = '';
+  }
+  renderGame();
+});
+
+socket.on('choices', words => showChooser(words));
+socket.on('word', d => { myWord = d.word; renderGame(); });
+socket.on('hint', d => { hint = d.hint; renderGame(); });
+socket.on('correct', d => addLog(`You guessed it! +${d.points} points`, 'sys'));
+socket.on('system', d => addLog(d.text, 'sys'));
+socket.on('chat', d => {
+  if (muted.has(d.from)) return;
+  addLog(`${d.name}: ${d.text}`);
+});
+socket.on('gameover', d => showResults(d.results));
+
+// ---------- Rendering ----------
+function renderGame() {
+  if (!state) return;
+  const isOwner = state.owner === playerId;
+  const isDrawer = state.drawerId === playerId;
+  const drawer = state.players.find(p => p.id === state.drawerId);
+  const drawerName = drawer ? drawer.name : '';
+
+  let text = '';
+  switch (state.state) {
+    case 'lobby':
+      text = 'Waiting for players. Use Invite to bring friends in.';
+      break;
+    case 'choosing':
+      text = isDrawer ? 'Pick a word to draw' : `${drawerName} is picking a word`;
+      break;
+    case 'drawing':
+      text = isDrawer ? `Draw: ${myWord || ''}` : `Guess: ${hint}`;
+      break;
+    case 'reveal':
+      text = 'Round over';
+      break;
+    case 'over':
+      text = 'Game over';
+      break;
+  }
+  const prefix = state.round ? `Round ${state.round}/${state.rounds} · ` : '';
+  $('info').textContent = prefix + text;
+
+  // Owner controls appear in the lobby and between games.
+  const canConfigure = isOwner && (state.state === 'lobby' || state.state === 'over');
+  $('ownerBar').style.display = canConfigure ? 'flex' : 'none';
+  $('rounds').value = String(state.rounds);
+  $('startBtn').textContent = state.state === 'over' ? 'Play again' : 'Start game';
+
+  // Drawing tools only appear for the drawer during their turn.
+  const canDraw = isDrawer && state.state === 'drawing';
+  $('tools').style.display = canDraw ? 'flex' : 'none';
+  fitCanvas();
+
+  // Player chips
+  const list = $('players');
+  list.innerHTML = '';
+  for (const p of state.players) {
+    const chip = document.createElement('div');
+    chip.className = 'chip'
+      + (p.id === state.drawerId ? ' drawer' : '')
+      + (!p.connected ? ' offline' : '')
+      + (p.id === playerId ? ' me' : '');
+    const host = p.id === state.owner ? '[host] ' : '';
+    const off = p.connected ? '' : ' (offline)';
+    const mute = muted.has(p.id) ? ' 🔇' : '';
+    chip.textContent = `${host}${p.name} ${p.score}${off}${mute}`;
+    if (p.id !== playerId) {
+      chip.onclick = () => {
+        selectedId = selectedId === p.id ? null : p.id;
+        renderActions();
+      };
+    }
+    list.appendChild(chip);
+  }
+  renderActions();
+}
+
+function btn(label, onClick, cls = '') {
+  const b = document.createElement('button');
+  b.textContent = label;
+  if (cls) b.className = cls;
+  b.onclick = onClick;
+  return b;
+}
+
+function renderActions() {
+  const bar = $('actions');
+  const target = state && state.players.find(p => p.id === selectedId);
+  if (!target) {
+    selectedId = null;
+    bar.style.display = 'none';
+    return;
+  }
+  bar.style.display = 'flex';
+  bar.innerHTML = '';
+  bar.append(`${target.name}: `);
+  const isMuted = muted.has(target.id);
+  bar.append(btn(isMuted ? 'Unmute' : 'Mute', () => toggleMute(target.id), 'secondary small'));
+  if (state.owner === playerId) {
+    bar.append(btn('Kick', () => socket.emit('kick', target.id), 'danger small'));
+    bar.append(btn('Ban', () => {
+      if (confirm(`Ban ${target.name} from this room?`)) socket.emit('ban', target.id);
+    }, 'danger small'));
+  }
+}
+
+function toggleMute(id) {
+  if (muted.has(id)) {
+    muted.delete(id);
+    socket.emit('mute', { id, on: false });
+  } else {
+    muted.add(id);
+    socket.emit('mute', { id, on: true });
+  }
+  renderGame();
+}
+
+function addLog(text, cls) {
+  const log = $('log');
+  const d = document.createElement('div');
+  if (cls) d.className = cls;
+  d.textContent = text;
+  log.appendChild(d);
+  while (log.childElementCount > 100) log.firstElementChild.remove();
+  log.scrollTop = log.scrollHeight;
+}
+
+function showChooser(words) {
+  const box = $('chooserWords');
+  box.innerHTML = '';
+  for (const w of words) {
+    box.appendChild(btn(w, () => {
+      socket.emit('choose', w);
+      $('chooser').style.display = 'none';
+    }));
+  }
+  $('chooser').style.display = 'flex';
+}
+
+function showResults(results) {
+  const box = $('resultsList');
+  box.innerHTML = '';
+  results.forEach((r, i) => {
+    const row = document.createElement('div');
+    row.textContent = `${i + 1}. ${r.name}: ${r.score}`;
+    box.appendChild(row);
+  });
+  $('results').style.display = 'flex';
+}
+$('closeResults').onclick = () => { $('results').style.display = 'none'; };
+
+setInterval(() => {
+  if (!state) return;
+  const t = $('timer');
+  if ((state.state === 'drawing' || state.state === 'choosing') && endsAt) {
+    t.textContent = Math.max(0, Math.ceil((endsAt - Date.now()) / 1000));
+  } else {
+    t.textContent = '';
+  }
+}, 250);
+
+// ---------- Owner controls ----------
+$('startBtn').onclick = () => socket.emit('start');
+$('rounds').onchange = e => socket.emit('settings', { rounds: e.target.value });
+
+// ---------- Guessing ----------
+$('guessForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const input = $('guessInput');
+  const text = input.value.trim();
+  if (!text) return;
+  socket.emit('guess', text);
+  input.value = '';
+});
+
+// ---------- Drawing board ----------
+const canvas = $('board');
+const ctx = canvas.getContext('2d');
+canvas.width = 800;
+canvas.height = 600;
+
+function clearBoard() {
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+clearBoard();
+
+function drawSeg(s) {
+  ctx.strokeStyle = s.color;
+  ctx.lineWidth = s.size;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(s.x0 * canvas.width, s.y0 * canvas.height);
+  ctx.lineTo(s.x1 * canvas.width, s.y1 * canvas.height);
+  ctx.stroke();
+}
+
+// Scale the board to fit the space, keeping its shape.
+function fitCanvas() {
+  const wrap = $('canvasWrap');
+  const w = wrap.clientWidth - 20;
+  const h = wrap.clientHeight - 20;
+  if (w <= 0 || h <= 0) return;
+  const scale = Math.min(w / 800, h / 600);
+  canvas.style.width = Math.floor(800 * scale) + 'px';
+  canvas.style.height = Math.floor(600 * scale) + 'px';
+}
+
+// Keyboard fix: size the whole game to the area still visible above the keyboard.
+function fitToViewport() {
+  const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  $('game').style.height = h + 'px';
+  window.scrollTo(0, 0);
+  fitCanvas();
+}
+if (window.visualViewport) window.visualViewport.addEventListener('resize', fitToViewport);
+window.addEventListener('resize', fitToViewport);
+fitToViewport();
+
+function canDrawNow() {
+  return state && state.state === 'drawing' && state.drawerId === playerId;
+}
+
+function normalize(e) {
+  const r = canvas.getBoundingClientRect();
+  const x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+  const y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+  return { x, y };
+}
+
+canvas.addEventListener('pointerdown', e => {
+  if (!canDrawNow()) return;
+  drawing = true;
+  canvas.setPointerCapture(e.pointerId);
+  last = normalize(e);
+});
+
+canvas.addEventListener('pointermove', e => {
+  if (!drawing) return;
+  const p = normalize(e);
+  const seg = { x0: last.x, y0: last.y, x1: p.x, y1: p.y, color, size: brush };
+  drawSeg(seg);
+  socket.emit('stroke', seg);
+  last = p;
+});
+
+function stopDrawing() {
+  drawing = false;
+  last = null;
+}
+canvas.addEventListener('pointerup', stopDrawing);
+canvas.addEventListener('pointercancel', stopDrawing);
+
+socket.on('stroke', drawSeg);
+socket.on('strokes', list => { clearBoard(); list.forEach(drawSeg); });
+socket.on('clear', clearBoard);
+
+$('clearBtn').onclick = () => {
+  if (!canDrawNow()) return;
+  socket.emit('clear');
+  clearBoard();
+};
+
+// Colors and brush sizes
+const palette = ['#111111', '#e03131', '#2f9e44', '#1971c2', '#f08c00', '#7048e8', '#ffffff'];
+const swatchBox = $('swatches');
+palette.forEach(c => {
+  const s = document.createElement('span');
+  s.className = 'swatch' + (c === color ? ' on' : '');
+  s.style.background = c;
+  s.onclick = () => {
+    color = c;
+    document.querySelectorAll('.swatch').forEach(x => x.classList.remove('on'));
+    s.classList.add('on');
+  };
+  swatchBox.appendChild(s);
+});
+document.querySelectorAll('[data-size]').forEach(b => {
+  b.onclick = () => { brush = Number(b.dataset.size); };
+});
+
+// ---------- First screen ----------
+// An invite link for a different room than the one we were in: show the join screen.
+if (urlRoom && urlRoom.toUpperCase() !== roomCode) {
+  roomCode = null;
+  localStorage.removeItem('doodle_room');
+}
+// If we were in a room, the 'connect' handler rejoins it automatically.
+// Otherwise, show the lobby right away.
+if (!roomCode) showLobby('');
+</script>
+</body>
+</html>
