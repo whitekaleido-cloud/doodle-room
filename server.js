@@ -5,6 +5,7 @@ const http = require('http');
 const path = require('path');
 const crypto = require('crypto');
 const { Server } = require('socket.io');
+const wordLists = require('./words');
 
 // ---------------------------------------------------------------------------
 // Settings you may want to change
@@ -29,43 +30,7 @@ const MAX_OPS = 6000;
 const MAX_POINTS = 120000;
 const MAX_POINTS_PER_CHUNK = 200;
 
-// Edit this list to change the built-in words. Keep them short and drawable.
-const WORDS = [
-  // animals
-  'cat', 'dog', 'fish', 'bird', 'horse', 'cow', 'pig', 'sheep', 'duck', 'chicken', 'rabbit', 'mouse',
-  'lion', 'tiger', 'bear', 'elephant', 'giraffe', 'monkey', 'zebra', 'penguin', 'snake', 'frog',
-  'turtle', 'spider', 'butterfly', 'bee', 'ant', 'shark', 'whale', 'dolphin', 'octopus', 'crab',
-  'owl', 'parrot', 'kangaroo', 'panda', 'camel', 'snail', 'dinosaur', 'dragon', 'unicorn',
-  'crocodile', 'squirrel', 'bat', 'flamingo', 'hedgehog', 'peacock', 'seahorse', 'jellyfish', 'starfish',
-  // food
-  'apple', 'banana', 'grapes', 'orange', 'strawberry', 'watermelon', 'pineapple', 'cherry', 'lemon',
-  'carrot', 'corn', 'tomato', 'potato', 'mushroom', 'broccoli', 'pizza', 'burger', 'hot dog',
-  'sandwich', 'ice cream', 'cake', 'cookie', 'donut', 'popcorn', 'egg', 'cheese', 'bread', 'pancake',
-  'sushi', 'noodles', 'french fries', 'candy', 'lollipop', 'cupcake', 'chocolate', 'coffee', 'taco',
-  'pie', 'pretzel', 'honey', 'popsicle', 'cherry pie', 'banana split',
-  // vehicles and buildings
-  'house', 'car', 'bus', 'train', 'bicycle', 'airplane', 'boat', 'helicopter', 'rocket', 'truck',
-  'tractor', 'motorcycle', 'submarine', 'balloon', 'bridge', 'castle', 'tent', 'lighthouse',
-  'windmill', 'fountain', 'school', 'hospital', 'church', 'tower',
-  // objects
-  'umbrella', 'key', 'lock', 'clock', 'watch', 'phone', 'laptop', 'camera', 'television', 'lamp',
-  'chair', 'table', 'bed', 'door', 'window', 'ladder', 'scissors', 'hammer', 'saw', 'broom', 'bucket',
-  'bottle', 'cup', 'spoon', 'fork', 'knife', 'plate', 'bowl', 'candle', 'mirror', 'book', 'pencil',
-  'pen', 'backpack', 'hat', 'shoe', 'sock', 'glasses', 'crown', 'ring', 'necklace', 'guitar', 'piano',
-  'drum', 'violin', 'trumpet', 'microphone', 'headphones', 'flag', 'bell', 'battery', 'magnet',
-  'anchor', 'compass', 'map', 'kite', 'trophy', 'gift', 'envelope', 'toothbrush', 'soap', 'towel',
-  'bathtub', 'refrigerator', 'oven', 'fan', 'light bulb', 'flashlight', 'calculator', 'keyboard',
-  'wheel', 'skateboard', 'surfboard', 'football', 'basketball', 'tennis racket', 'swing', 'slide',
-  'treasure chest', 'sword', 'shield', 'bow and arrow', 'telescope', 'lantern',
-  // nature
-  'sun', 'moon', 'star', 'cloud', 'rainbow', 'lightning', 'snowflake', 'tornado', 'mountain',
-  'volcano', 'river', 'waterfall', 'island', 'beach', 'desert', 'forest', 'tree', 'flower', 'cactus',
-  'leaf', 'rose', 'sunflower', 'palm tree', 'igloo', 'cave',
-  // characters and body
-  'pirate', 'ghost', 'robot', 'alien', 'wizard', 'witch', 'mermaid', 'snowman', 'scarecrow',
-  'vampire', 'knight', 'astronaut', 'cowboy', 'clown', 'ninja', 'king', 'queen', 'angel', 'zombie',
-  'skeleton', 'eye', 'nose', 'ear', 'hand', 'foot', 'heart', 'tooth', 'skull', 'brain', 'bone',
-];
+// Words live in words.js (easy, medium and hard lists). Edit that file to change them.
 
 // ---------------------------------------------------------------------------
 // Server setup
@@ -91,6 +56,23 @@ const normalize = s => stripControl(s).toLowerCase().trim().replace(/\s+/g, ' ')
 function sanitizeName(s) {
   return stripControl(s).trim().slice(0, 16) || 'Player';
 }
+
+// ----- Word pools by difficulty -----
+const LEVELS = ['easy', 'medium', 'hard'];
+const DIFFICULTIES = ['easy', 'medium', 'hard', 'mixed'];
+const LEVEL_MULT = { easy: 1, medium: 1.25, hard: 1.5, custom: 1 }; // harder words earn more points
+const POOLS = { easy: [], medium: [], hard: [] };
+(function buildPools() {
+  const seen = new Set();
+  for (const lvl of LEVELS) {
+    for (const raw of wordLists[lvl] || []) {
+      const w = normalize(raw);
+      if (!w || seen.has(w)) continue; // the easier list wins if a word is repeated
+      seen.add(w);
+      POOLS[lvl].push(w);
+    }
+  }
+})();
 
 function sanitizeAvatar(a) {
   const out = [];
@@ -170,13 +152,14 @@ function createRoom(ownerId, isPublic) {
     players: new Map(),
     banned: new Set(),
     tempBans: new Map(),
-    settings: { rounds: 3, drawTime: 60, maxPlayers: HARD_MAX_PLAYERS, isPublic: !!isPublic, customWords: [], customOnly: false },
+    settings: { rounds: 3, drawTime: 60, maxPlayers: HARD_MAX_PLAYERS, difficulty: 'medium', isPublic: !!isPublic, customWords: [], customOnly: false },
     state: 'lobby', // lobby | choosing | drawing | reveal | paused | over
     round: 0,
     order: [],
     drawerIdx: -1,
     drawerId: null,
     word: null,
+    wordLevel: 'easy',
     choices: [],
     guessed: new Set(),
     turnPoints: new Map(),
@@ -244,6 +227,7 @@ function stateFor(room, forId) {
       rounds: s.rounds,
       drawTime: s.drawTime,
       maxPlayers: s.maxPlayers,
+      difficulty: s.difficulty,
       isPublic: s.isPublic,
       customOnly: s.customOnly,
       customCount: s.customWords.length,
@@ -309,15 +293,32 @@ function syncRoom(room) {
 // Game flow
 // ---------------------------------------------------------------------------
 function pickWords(room, n) {
-  const s = room.settings;
-  const pool = s.customOnly && s.customWords.length >= 3
-    ? [...s.customWords]
-    : [...new Set([...WORDS, ...s.customWords])];
-  const out = [];
-  while (out.length < n && pool.length > 0) {
-    out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  const st = room.settings;
+  const custom = st.customWords;
+  const take = (pool, count) => {
+    const p = [...pool];
+    const out = [];
+    while (out.length < count && p.length > 0) out.push(p.splice(Math.floor(Math.random() * p.length), 1)[0]);
+    return out;
+  };
+  const tag = (words, level) => words.map(w => ({ word: w, level: custom.includes(w) ? 'custom' : level }));
+
+  if (st.customOnly && custom.length >= 3) return tag(take(custom, n), 'custom');
+
+  if (st.difficulty === 'mixed') {
+    // One easy, one medium and one hard word, in random order
+    const picks = [
+      ...tag(take([...POOLS.easy, ...custom], 1), 'easy'),
+      ...tag(take(POOLS.medium, 1), 'medium'),
+      ...tag(take(POOLS.hard, 1), 'hard'),
+    ];
+    for (let i = picks.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [picks[i], picks[j]] = [picks[j], picks[i]];
+    }
+    return picks;
   }
-  return out;
+  return tag(take([...POOLS[st.difficulty], ...custom], n), st.difficulty);
 }
 
 function startGame(room) {
@@ -373,14 +374,17 @@ function nextTurn(room) {
   room.pointCount = 0;
   room.endsAt = Date.now() + CHOOSE_SECONDS * 1000;
   broadcast(room, 'clear', {});
-  room.timer = setTimeout(() => chooseWord(room, room.choices[0]), CHOOSE_SECONDS * 1000);
+  room.timer = setTimeout(() => chooseWord(room, room.choices[0].word), CHOOSE_SECONDS * 1000);
   syncRoom(room);
 }
 
 function chooseWord(room, word) {
   if (room.state !== 'choosing' || !word) return;
+  const picked = room.choices.find(c => c.word === word);
+  if (!picked) return;
   clearTimeout(room.timer);
   room.word = word;
+  room.wordLevel = picked.level;
   room.state = 'drawing';
   room.revealed = new Set();
   room.endsAt = Date.now() + room.settings.drawTime * 1000;
@@ -438,7 +442,7 @@ function endTurn(room) {
 
   room.state = 'reveal';
   room.endsAt = 0;
-  broadcast(room, 'turnEnd', { word, results });
+  broadcast(room, 'turnEnd', { word, level: room.wordLevel, results });
   syncRoom(room);
   room.timer = setTimeout(() => nextTurn(room), REVEAL_MS);
 }
@@ -449,6 +453,7 @@ function endGame(room) {
   room.hintTimers.forEach(clearTimeout);
   room.hintTimers = [];
   room.state = 'over';
+  room.round = Math.min(room.round, room.settings.rounds);
   room.drawerId = null;
   room.word = null;
   room.endsAt = 0;
@@ -624,9 +629,6 @@ io.on('connection', socket => {
       if (['choosing', 'drawing', 'reveal', 'paused'].includes(room.state) && !room.order.includes(playerId)) {
         room.order.push(playerId);
       }
-      if (room.players.size > 1 && room.state !== 'lobby' && room.state !== 'over') {
-        broadcast(room, 'system', { text: `${name} joined the game.` });
-      }
     }
 
     socket.data = { code: room.code, playerId };
@@ -656,6 +658,7 @@ io.on('connection', socket => {
     const dt = parseInt(d.drawTime, 10);
     s.drawTime = DRAW_TIMES.includes(dt) ? dt : 60;
     s.maxPlayers = clamp(parseInt(d.maxPlayers, 10) || HARD_MAX_PLAYERS, Math.max(2, room.players.size), HARD_MAX_PLAYERS);
+    s.difficulty = DIFFICULTIES.includes(d.difficulty) ? d.difficulty : 'medium';
     s.isPublic = !!d.isPublic;
     s.customWords = parseCustomWords(d.customWords);
     s.customOnly = !!d.customOnly && s.customWords.length >= 3;
@@ -678,7 +681,7 @@ io.on('connection', socket => {
   socket.on('choose', word => {
     const room = getRoom();
     if (!room || room.state !== 'choosing' || socket.data.playerId !== room.drawerId) return;
-    if (!room.choices.includes(word)) return;
+    if (!room.choices.some(c => c.word === word)) return;
     touch(room);
     chooseWord(room, word);
   });
@@ -739,7 +742,8 @@ io.on('connection', socket => {
         if (guess === answer) {
           room.guessed.add(me.id);
           const left = Math.max(0, room.endsAt - Date.now());
-          const points = 100 + Math.round(200 * (left / (room.settings.drawTime * 1000)));
+          const base = 100 + 200 * (left / (room.settings.drawTime * 1000));
+          const points = Math.round(base * (LEVEL_MULT[room.wordLevel] || 1));
           me.score += points;
           room.turnPoints.set(me.id, (room.turnPoints.get(me.id) || 0) + points);
           const drawer = room.players.get(room.drawerId);
@@ -749,7 +753,7 @@ io.on('connection', socket => {
             room.turnPoints.set(drawer.id, (room.turnPoints.get(drawer.id) || 0) + bonus);
           }
           sendTo(room, me.id, 'correct', { points });
-          broadcast(room, 'system', { text: `${me.name} guessed the word!`, kind: 'good' });
+          broadcast(room, 'system', { text: `${me.name} guessed the word!`, kind: 'good', who: me.id });
           syncRoom(room);
           if (allGuessed(room)) endTurn(room);
           return;

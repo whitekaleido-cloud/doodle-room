@@ -38,6 +38,7 @@
   button, input, select, textarea { font-family: inherit; color: inherit; }
   button { touch-action: manipulation; }
   svg { display: block; }
+  .hide { display: none !important; }
 
   /* ---------- Shared pieces ---------- */
   .btn {
@@ -81,6 +82,31 @@
     box-shadow: 0 5px 0 rgba(10, 20, 70, 0.25);
     padding: 14px;
   }
+  .lvl { display: inline-block; border-radius: 999px; padding: 1px 9px; font-size: 12px; font-weight: 700; color: #fff; line-height: 1.5; }
+  .lvl-easy { background: #2fb350; }
+  .lvl-medium { background: #f08a1c; }
+  .lvl-hard { background: #ef4458; }
+  .lvl-custom { background: #8a4fe0; }
+
+  /* ---------- Ad slots (hidden until ads are switched on) ---------- */
+  .adslot {
+    display: none;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border: 2px dashed rgba(255, 255, 255, 0.6);
+    border-radius: 8px;
+    background: rgba(10, 20, 70, 0.28);
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 12px;
+    font-weight: 600;
+    overflow: hidden;
+  }
+  .ad-rect { width: 300px; max-width: 100%; height: 250px; }
+  body.ads #adTop { display: flex; width: 320px; max-width: 100%; height: 50px; margin: 0 auto; }
+  #adTop .adlabel::after { content: ' 320 x 50'; }
+  .ad-rect .adlabel::after { content: ' 300 x 250'; }
+  body.kb.short #adTop { display: none; }
 
   /* ---------- Home screen ---------- */
   #home {
@@ -178,9 +204,9 @@
     flex: none;
     display: grid;
     grid-template-columns: auto 1fr auto;
-    grid-template-areas: 'timer round btns' 'status status status';
+    grid-template-areas: 'timer status btns';
     align-items: center;
-    gap: 2px 8px;
+    gap: 6px 10px;
     background: #fff;
     border-radius: 14px;
     padding: 6px 8px;
@@ -188,8 +214,8 @@
   }
   #timerBox { grid-area: timer; }
   #timer {
-    width: 40px;
-    height: 40px;
+    width: 42px;
+    height: 42px;
     border-radius: 50%;
     background: var(--sun);
     border: 3px solid var(--navy);
@@ -200,12 +226,13 @@
     font-variant-numeric: tabular-nums;
   }
   #timer.low { background: var(--coral); color: #fff; }
-  #roundInfo { grid-area: round; font-weight: 600; font-size: 16px; }
-  #status { grid-area: status; text-align: center; min-height: 34px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  #roundInfo { grid-area: round; display: none; font-weight: 600; font-size: 16px; }
+  #status { grid-area: status; text-align: center; min-height: 42px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
   #topBtns { grid-area: btns; display: flex; gap: 6px; }
+  .dbtn { display: none; }
   #topBtns .lbl { display: none; }
-  .stxt { font-weight: 600; font-size: 17px; }
-  .tiny { font-size: 12px; font-weight: 600; opacity: 0.6; line-height: 1.1; }
+  .stxt { font-weight: 600; font-size: 17px; line-height: 1.2; }
+  .tiny { font-size: 12px; font-weight: 600; opacity: 0.62; line-height: 1.15; }
   .theword { font-size: 24px; font-weight: 700; line-height: 1.15; }
   .slots { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-end; gap: 3px 4px; font-weight: 700; font-size: 22px; }
   .slot { display: inline-block; min-width: 0.78em; height: 1.2em; text-align: center; border-bottom: 3px solid var(--navy); line-height: 1.15; text-transform: uppercase; }
@@ -275,14 +302,77 @@
   .row-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
   .waitmsg { font-weight: 500; opacity: 0.75; font-size: 15px; }
   #chooserWords { display: flex; flex-direction: column; gap: 8px; }
+  .wbtn { display: flex; align-items: center; justify-content: center; gap: 10px; }
   .res-list { display: flex; flex-direction: column; gap: 5px; text-align: left; }
   .res { display: flex; align-items: center; gap: 8px; background: var(--mist); border-radius: 10px; padding: 4px 8px; }
   .res .ra { flex: none; width: 30px; height: 30px; }
   .res .rn { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .res .rg { font-weight: 700; color: #1f9d3d; }
   .res .rt { font-weight: 600; min-width: 40px; text-align: right; }
-  .res.top { background: #fff0b0; }
   .bigword { font-size: 30px; font-weight: 700; line-height: 1.1; }
+
+  /* ---------- Winner podium ---------- */
+  .podium {
+    background: radial-gradient(circle at 50% 0%, rgba(90, 130, 255, 0.97), rgba(12, 25, 80, 0.98) 75%);
+    overflow-y: auto;
+    align-items: flex-start;
+    --av: 58px;
+    --h1: 90px;
+    --h2: 66px;
+    --h3: 48px;
+  }
+  #confetti { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+  .pod-wrap { position: relative; z-index: 1; width: min(560px, 100%); margin: auto; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 6px 2px; }
+  .pod-title {
+    font-size: clamp(22px, 6vw, 36px);
+    font-weight: 700;
+    color: #fff;
+    text-align: center;
+    line-height: 1.1;
+    text-shadow: -2px -2px 0 var(--navy), 2px -2px 0 var(--navy), -2px 2px 0 var(--navy), 2px 2px 0 var(--navy), 0 4px 0 var(--navy);
+    margin-bottom: calc(var(--av) * 0.36);
+    animation: popIn 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.3) 1.3s both;
+  }
+  .pod-stage { display: flex; align-items: flex-end; justify-content: center; gap: 6px; width: 100%; margin-top: 2px; padding: 0 4px; border-bottom: 4px solid var(--navy); }
+  .pod-col {
+    position: relative;
+    flex: 1 1 0;
+    max-width: 170px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    animation: podRise 0.65s cubic-bezier(0.2, 0.9, 0.3, 1.25) var(--d, 0s) both;
+  }
+  .pod-av { position: relative; width: var(--av); height: var(--av); }
+  .pod-crown { position: absolute; left: 50%; top: -30%; width: 62%; transform: translateX(-50%) rotate(-8deg); z-index: 2; }
+  .pod-trophy { position: absolute; right: -52%; top: 28%; width: 62%; z-index: 2; }
+  .r1 .pod-av > svg:not(.pod-crown):not(.pod-trophy) { animation: bob 1.3s ease-in-out 2.1s infinite; }
+  .pod-name { max-width: 100%; margin-top: 2px; color: #fff; font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4); }
+  .pod-pts { color: #ffe9a8; font-size: 13px; font-weight: 500; margin-bottom: 4px; }
+  .pod-block {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    padding-top: 4px;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--navy);
+    border: 3px solid var(--navy);
+    border-bottom: 0;
+    border-radius: 10px 10px 0 0;
+  }
+  .r1 .pod-block { height: var(--h1); background: linear-gradient(#ffe36e, #ffc21a); }
+  .r2 .pod-block { height: var(--h2); background: linear-gradient(#eef3ff, #b9c6e0); }
+  .r3 .pod-block { height: var(--h3); background: linear-gradient(#f5b983, #d88a4a); }
+  .pod-wrap.still .pod-col, .pod-wrap.still .pod-title { animation: none; }
+  .pod-rest { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; width: 100%; }
+  .pill { display: flex; align-items: center; gap: 6px; background: #fff; border-radius: 999px; padding: 3px 12px 3px 4px; font-size: 13px; font-weight: 600; }
+  .pill .pa { width: 26px; height: 26px; flex: none; }
+  .pill .pp { opacity: 0.65; font-weight: 500; }
+  @keyframes podRise { from { opacity: 0; transform: translateY(70px) scale(0.9); } to { opacity: 1; transform: none; } }
+  @keyframes popIn { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: none; } }
+  @keyframes bob { 50% { transform: translateY(-6px); } }
 
   #tools { display: none; background: #fff; border-radius: 14px; padding: 6px; box-shadow: 0 4px 0 rgba(10, 20, 70, 0.22); }
   #tools.on { display: flex; flex-direction: column; gap: 6px; }
@@ -297,8 +387,11 @@
   .sizebtn { width: 30px !important; }
   .sizebtn i { display: block; border-radius: 50%; background: var(--navy); }
 
-  #chat { flex: 1 1 0; display: flex; flex-direction: column; background: #fff; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 0 rgba(10, 20, 70, 0.22); user-select: text; -webkit-user-select: text; }
-  #log { flex: 1 1 0; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 3px 0; font-size: 15px; }
+  #chat { position: relative; flex: 1 1 0; display: flex; flex-direction: column; background: #fff; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 0 rgba(10, 20, 70, 0.22); user-select: text; -webkit-user-select: text; }
+  #logWrap { position: relative; flex: 1 1 0; min-height: 0; display: flex; }
+  #log { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 3px 0; font-size: 15px; }
+  #jumpBtn { display: none; position: absolute; right: 10px; bottom: 8px; z-index: 2; }
+  #jumpBtn.on { display: block; }
   .msg { padding: 3px 10px; word-break: break-word; line-height: 1.3; }
   .msg:nth-child(even) { background: #f4f7ff; }
   .msg b { font-weight: 600; }
@@ -312,9 +405,14 @@
   #guessInput { flex: 1; min-width: 0; padding: 10px 12px; }
 
   body.kb #players { display: none; }
-  body.kb #roundInfo, body.kb #topBtns { display: none; }
-  body.kb #topbar { grid-template-columns: auto 1fr; grid-template-areas: 'timer status'; }
+  body.kb #roundInfo, body.kb #topBtns, body.kb .tiny { display: none; }
+  body.kb #topbar { grid-template-columns: auto 1fr; grid-template-areas: 'timer status'; padding: 4px 8px; }
+  body.kb #timer { width: 36px; height: 36px; font-size: 16px; }
   body.kb #status { min-height: 0; }
+  body.kb .slots { font-size: 17px; gap: 2px 3px; }
+  body.kb .slot { border-bottom-width: 2px; }
+  body.kb .slots .len { font-size: 11px; }
+  body.kb .theword { font-size: 20px; }
 
   /* ---------- Desktop and tablets: three columns ---------- */
   @media (min-width: 1000px) and (min-height: 521px) {
@@ -326,14 +424,20 @@
       gap: 10px;
       padding: 10px;
     }
+    body.ads #game.show { grid-template-rows: auto auto minmax(0, 1fr); grid-template-areas: 'ad ad ad' 'top top top' 'players center chat'; }
+    #adTop { grid-area: ad; }
+    body.ads #adTop { display: none; }
     #topbar { grid-area: top; grid-template-columns: auto 180px 1fr auto; grid-template-areas: 'timer round status btns'; gap: 12px; padding: 8px 14px; }
+    #roundInfo { display: block; font-size: 18px; }
+    .rnd-part { display: none; }
+    .dbtn { display: inline-block; }
+    #menuBtn { display: none; }
+    #topBtns .lbl { display: inline; }
     #players { grid-area: players; flex-direction: column; overflow-y: auto; overflow-x: hidden; background: #fff; border-radius: 14px; padding: 8px; gap: 6px; box-shadow: 0 4px 0 rgba(10, 20, 70, 0.22); }
     #center { grid-area: center; flex: 1 1 auto; gap: 10px; }
     #canvasWrap { flex: 1 1 0; min-height: 0; }
     #chat { grid-area: chat; }
     #timer { width: 48px; height: 48px; font-size: 21px; }
-    #roundInfo { font-size: 18px; }
-    #topBtns .lbl { display: inline; }
     .slots { font-size: 30px; }
     .slot { border-bottom-width: 4px; }
     .theword { font-size: 30px; }
@@ -355,6 +459,21 @@
     .ovp { width: min(400px, 100%); padding: 18px; gap: 12px; }
     .ovp h2 { font-size: 24px; }
     .code { font-size: 46px; }
+    .podium { --av: 92px; --h1: 150px; --h2: 112px; --h3: 82px; }
+    .pod-wrap { width: min(680px, 100%); gap: 12px; }
+    .pod-name { font-size: 18px; }
+    .pod-pts { font-size: 15px; }
+    .pod-block { font-size: 38px; }
+  }
+  @media (min-width: 1000px) and (min-height: 760px) {
+    body.ads #adTop { display: flex; width: 728px; height: 90px; }
+    body.ads #adTop .adlabel::after { content: ' 728 x 90'; }
+  }
+  @media (min-width: 1000px) and (min-height: 820px) {
+    body.ads #lobbyAd { display: flex; }
+  }
+  @media (min-width: 1000px) and (min-height: 900px) {
+    body.ads #podAd { display: flex; }
   }
 
   /* ---------- Phone held sideways: canvas on the left, players and chat on the right ---------- */
@@ -366,9 +485,11 @@
       grid-template-areas: 'top top' 'center players' 'center chat';
       gap: 4px 6px;
     }
+    #adTop, body.ads #adTop { display: none !important; }
     #topbar { grid-area: top; grid-template-columns: auto auto 1fr auto; grid-template-areas: 'timer round status btns'; gap: 10px; padding: 3px 8px; }
+    #roundInfo { display: block; font-size: 14px; }
+    .rnd-part { display: none; }
     #timer { width: 34px; height: 34px; font-size: 16px; }
-    #roundInfo { font-size: 14px; }
     #status { min-height: 0; }
     .stxt { font-size: 15px; }
     .slots { font-size: 20px; }
@@ -393,6 +514,11 @@
     .ovp h2 { font-size: 17px; }
     .code { font-size: 28px; padding: 4px 4px 4px 10px; }
     .bigword { font-size: 22px; }
+    .podium { --av: 40px; --h1: 58px; --h2: 44px; --h3: 32px; }
+    .pod-block { font-size: 18px; }
+    .pod-name { font-size: 13px; }
+    .pod-pts { font-size: 11px; margin-bottom: 2px; }
+    .pod-title { font-size: 20px; }
     body.kb #game.show { grid-template-rows: auto 0 minmax(0, 1fr); }
   }
 
@@ -469,6 +595,7 @@
   }
   @media (prefers-reduced-motion: reduce) {
     .btn { transition: none; }
+    .pod-col, .pod-title, .r1 .pod-av > svg { animation: none !important; }
   }
 </style>
 </head>
@@ -514,14 +641,19 @@
 
 <!-- ============ GAME ============ -->
 <div id="game">
+  <!-- Ad slot. Hidden until ads are switched on (see ADS_ENABLED in the script) -->
+  <div id="adTop" class="adslot"><span class="adlabel">Ad space</span></div>
+
   <header id="topbar">
     <div id="timerBox"><div id="timer">–</div></div>
     <div id="roundInfo">Lobby</div>
     <div id="status"></div>
     <div id="topBtns">
-      <button id="inviteBtn" class="btn sm" aria-label="Invite friends">🔗<span class="lbl"> Invite</span></button>
-      <button id="settingsBtn" class="btn sm yellow" aria-label="Room settings">⚙️<span class="lbl"> Settings</span></button>
-      <button id="leaveBtn" class="btn sm red" aria-label="Leave room">🚪<span class="lbl"> Leave</span></button>
+      <button id="inviteBtn" class="btn sm dbtn" aria-label="Invite friends">🔗<span class="lbl"> Invite</span></button>
+      <button id="settingsBtn" class="btn sm yellow dbtn" aria-label="Room settings">⚙️<span class="lbl"> Settings</span></button>
+      <button id="soundBtn" class="btn sm gray dbtn" aria-label="Sound on or off">🔊<span class="lbl"> Sound</span></button>
+      <button id="leaveBtn" class="btn sm red dbtn" aria-label="Leave room">🚪<span class="lbl"> Leave</span></button>
+      <button id="menuBtn" class="btn sm gray" aria-label="Menu">☰</button>
     </div>
   </header>
 
@@ -542,6 +674,7 @@
             <button id="startBtn" class="btn green big">Start game</button>
           </div>
           <div id="lobbyWait" class="waitmsg">Waiting for the host to start the game…</div>
+          <div id="lobbyAd" class="adslot ad-rect" style="margin:0 auto"><span class="adlabel">Ad space</span></div>
         </div>
       </div>
 
@@ -563,19 +696,23 @@
         <div class="panel ovp">
           <div class="waitmsg">The word was</div>
           <div class="bigword" id="turnWord"></div>
+          <div id="turnLevel"></div>
           <div class="res-list" id="turnList"></div>
         </div>
       </div>
 
-      <div class="ov" id="ovOver">
-        <div class="panel ovp">
-          <h2>🏆 Game over</h2>
-          <div class="res-list" id="overList"></div>
+      <div class="ov podium" id="ovOver">
+        <canvas id="confetti"></canvas>
+        <div class="pod-wrap" id="podWrap">
+          <div class="pod-title" id="podTitle"></div>
+          <div class="pod-stage" id="podStage"></div>
+          <div class="pod-rest" id="podRest"></div>
           <div id="overHost" class="row-btns">
             <button id="overSettings" class="btn yellow sm">⚙️ Settings</button>
             <button id="againBtn" class="btn green">Play again</button>
           </div>
-          <div id="overWait" class="waitmsg">Waiting for the host to start another game…</div>
+          <div id="overWait" class="waitmsg" style="color:#fff">Waiting for the host to start another game…</div>
+          <div id="podAd" class="adslot ad-rect"><span class="adlabel">Ad space</span></div>
         </div>
       </div>
 
@@ -613,7 +750,10 @@
   </main>
 
   <section id="chat" aria-label="Chat and guesses">
-    <div id="log" aria-live="polite"></div>
+    <div id="logWrap">
+      <div id="log" aria-live="polite"></div>
+      <button id="jumpBtn" class="btn sm" type="button">↓ Latest</button>
+    </div>
     <form id="guessForm" autocomplete="off">
       <input id="guessInput" class="inp" placeholder="Type your guess here…" maxlength="80" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="send" />
       <button id="sendBtn" type="submit" class="btn sm">Send</button>
@@ -625,6 +765,15 @@
 <div class="modal" id="mSettings">
   <form class="sheet" id="settingsForm">
     <h2>Room settings</h2>
+    <label class="field">Word difficulty
+      <select id="setDiff">
+        <option value="easy">Easy</option>
+        <option value="medium">Medium</option>
+        <option value="hard">Hard (+50% points)</option>
+        <option value="mixed">Mixed (one of each to choose from)</option>
+      </select>
+      <span class="hintline">Medium words earn +25% points, hard words +50%.</span>
+    </label>
     <label class="field">Rounds
       <select id="setRounds"></select>
     </label>
@@ -647,6 +796,7 @@
   </form>
 </div>
 
+<div class="modal" id="mMenu"><div class="sheet" id="menuSheet"></div></div>
 <div class="modal" id="mPlayer"><div class="sheet" id="playerSheet"></div></div>
 
 <div class="modal" id="mDialog">
@@ -668,13 +818,86 @@
 (function () {
 'use strict';
 
+/* =====================================================================
+   Ads: set ADS_ENABLED to true when you have an ad network.
+   To preview where the ad boxes will go, open the game with ?ads=1 at the end of the address.
+   ===================================================================== */
+const ADS_ENABLED = false;
+if (ADS_ENABLED || /[?&]ads=1\b/.test(location.search)) document.body.classList.add('ads');
+
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
   del(k) { try { localStorage.removeItem(k); } catch (e) {} },
 };
+const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* =====================================================================
+   8-bit sound effects (made with code, no files, no background music)
+   ===================================================================== */
+const sfx = (function () {
+  let ctx = null;
+  let on = store.get('doodle_sound') !== 'off';
+  const SOUNDS = {
+    join:     { type: 'square',   vol: 0.06,  notes: [[660, 0.07], [880, 0.11]] },
+    leave:    { type: 'triangle', vol: 0.10,  notes: [[660, 0.07], [440, 0.14]] },
+    start:    { type: 'square',   vol: 0.06,  notes: [[523, 0.08], [659, 0.08], [784, 0.08], [1047, 0.2]] },
+    choose:   { type: 'square',   vol: 0.06,  notes: [[784, 0.05], [1047, 0.1]] },
+    yourturn: { type: 'square',   vol: 0.06,  notes: [[880, 0.08], [0, 0.04], [880, 0.08], [1175, 0.18]] },
+    correct:  { type: 'square',   vol: 0.07,  notes: [[784, 0.07], [988, 0.07], [1175, 0.07], [1568, 0.24]] },
+    other:    { type: 'triangle', vol: 0.09,  notes: [[988, 0.05], [1319, 0.09]] },
+    tick:     { type: 'square',   vol: 0.035, notes: [[1400, 0.03]] },
+    reveal:   { type: 'triangle', vol: 0.10,  notes: [[587, 0.08], [494, 0.08], [392, 0.18]] },
+    win:      { type: 'square',   vol: 0.06,  notes: [[523, 0.1], [523, 0.1], [523, 0.1], [659, 0.18], [0, 0.04], [587, 0.1], [659, 0.1], [784, 0.45]] },
+  };
+  function ensure() {
+    if (!ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      try { ctx = new AC(); } catch (e) { return null; }
+      try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {} // lets iPhones play sound with the silent switch on, where supported
+    }
+    try { if (ctx.state === 'suspended') { const p = ctx.resume(); if (p && p.catch) p.catch(() => {}); } } catch (e) {}
+    return ctx;
+  }
+  function tone(c, t, freq, dur, type, vol) {
+    const o = c.createOscillator();
+    const g = c.createGain();
+    o.type = type;
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.006);
+    g.gain.setValueAtTime(vol, t + Math.max(0.006, dur - 0.02));
+    g.gain.linearRampToValueAtTime(0.0001, t + dur);
+    o.connect(g);
+    g.connect(c.destination);
+    o.start(t);
+    o.stop(t + dur + 0.02);
+  }
+  return {
+    isOn: () => on,
+    setOn(v) { on = !!v; store.set('doodle_sound', on ? 'on' : 'off'); },
+    unlock() { ensure(); },
+    play(name) {
+      if (!on) return;
+      const def = SOUNDS[name];
+      if (!def) return;
+      const c = ensure();
+      if (!c) return;
+      let t = c.currentTime + 0.02;
+      for (const [f, d] of def.notes) {
+        if (f > 0) tone(c, t, f, d, def.type, def.vol);
+        t += d;
+      }
+    },
+  };
+})();
+// Browsers only allow sound after a tap, so the first tap switches it on
+document.addEventListener('pointerdown', () => sfx.unlock());
+document.addEventListener('keydown', () => sfx.unlock());
 
 /* =====================================================================
    Avatars: mix and match color, eyes, mouth, accessory and details
@@ -741,6 +964,9 @@ function avatarSVG(av) {
 }
 const randomAvatar = () => AV_PARTS.map(p => Math.floor(Math.random() * p.n));
 
+const CROWN_SVG = `<svg class="pod-crown" viewBox="0 0 60 40" aria-hidden="true"><path d="M6 34 L4 8 L18 20 L30 2 L42 20 L56 8 L54 34 Z" fill="#ffd23f" stroke="${INK}" stroke-width="3" stroke-linejoin="round"/><circle cx="30" cy="24" r="3.2" fill="#ff5d73"/><circle cx="14" cy="26" r="2.4" fill="#3aa7ff"/><circle cx="46" cy="26" r="2.4" fill="#3aa7ff"/></svg>`;
+const TROPHY_SVG = `<svg class="pod-trophy" viewBox="0 0 64 64" aria-hidden="true"><path d="M16 8h32v12c0 10-7 18-16 18S16 30 16 20z" fill="#ffd23f" stroke="${INK}" stroke-width="3" stroke-linejoin="round"/><path d="M16 14H8c0 10 4 16 10 17M48 14h8c0 10-4 16-10 17" fill="none" stroke="${INK}" stroke-width="3" stroke-linecap="round"/><rect x="28" y="38" width="8" height="10" fill="#ffd23f" stroke="${INK}" stroke-width="3"/><rect x="18" y="48" width="28" height="9" rx="2" fill="#ff9f43" stroke="${INK}" stroke-width="3"/><path d="M24 14v10" stroke="#fff" stroke-opacity=".7" stroke-width="3" stroke-linecap="round"/></svg>`;
+
 /* =====================================================================
    State
    ===================================================================== */
@@ -767,6 +993,9 @@ let inGame = false;
 let shownRoom = null;
 let autoJoining = false;
 let trapped = false;
+let knownPlayers = null;
+let lastTick = -1;
+let podiumSig = '';
 const muted = new Set();
 
 /* =====================================================================
@@ -804,15 +1033,29 @@ function ask(title, text, ok, cancel) {
   });
 }
 
+/* ----- Chat log: always shows the newest message, unless you scrolled up to read ----- */
+const logEl = $('log');
+let stick = true;
+logEl.addEventListener('scroll', () => {
+  stick = logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 30;
+  if (stick) $('jumpBtn').classList.remove('on');
+});
+function scrollLog(force) {
+  if (stick || force) {
+    logEl.scrollTop = logEl.scrollHeight;
+    stick = true;
+    $('jumpBtn').classList.remove('on');
+  }
+}
+$('jumpBtn').onclick = () => scrollLog(true);
 function addMsg(cls, build) {
-  const log = $('log');
-  const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 60;
   const d = document.createElement('div');
   d.className = 'msg ' + cls;
   build(d);
-  log.appendChild(d);
-  while (log.childElementCount > 120) log.firstElementChild.remove();
-  if (nearBottom) log.scrollTop = log.scrollHeight;
+  logEl.appendChild(d);
+  while (logEl.childElementCount > 120) logEl.firstElementChild.remove();
+  if (stick) logEl.scrollTop = logEl.scrollHeight;
+  else $('jumpBtn').classList.add('on');
 }
 const addSystem = (text, good) => addMsg(good ? 'good' : 'sys', d => (d.textContent = text));
 const addNote = text => addMsg('note', d => (d.textContent = text));
@@ -990,10 +1233,11 @@ socket.on('joined', d => {
   autoJoining = false;
   if (shownRoom !== d.code) {
     shownRoom = d.code;
-    $('log').innerHTML = '';
+    logEl.innerHTML = '';
+    stick = true;
     ops = [];
     clearBoard();
-    state = null; myWord = null; hint = null; choices = null; turnData = null;
+    state = null; myWord = null; hint = null; choices = null; turnData = null; knownPlayers = null; podiumSig = '';
     addNote('Welcome! Share the room code or press Invite to bring friends in.');
   }
   muted.forEach(id => socket.emit('mute', { id, on: true }));
@@ -1067,7 +1311,33 @@ $('lobbyInvite').onclick = invite;
 /* =====================================================================
    Messages from the server
    ===================================================================== */
+// Chat notes and sounds when players come and go
+function trackPlayers(s) {
+  const now = new Map(s.players.map(p => [p.id, p.name]));
+  if (knownPlayers) {
+    for (const [id, name] of now) {
+      if (!knownPlayers.has(id) && id !== playerId) { addNote(`${name} joined the room.`); sfx.play('join'); }
+    }
+    for (const [id, name] of knownPlayers) {
+      if (!now.has(id)) { addNote(`${name} left the room.`); sfx.play('leave'); }
+    }
+  }
+  knownPlayers = now;
+}
+
+// Sounds for each step of the game
+function stateSounds(prev, s) {
+  if (!prev) return;
+  const was = prev.state;
+  if ((was === 'lobby' || was === 'over') && s.state === 'choosing') sfx.play('start');
+  else if (s.state === 'choosing' && was !== 'choosing' && s.drawerId === playerId) sfx.play('yourturn');
+  if (was === 'choosing' && s.state === 'drawing') sfx.play('choose');
+  if (s.state === 'reveal' && was !== 'reveal') sfx.play('reveal');
+  if (s.state === 'over' && was !== 'over') sfx.play('win');
+}
+
 socket.on('state', s => {
+  const prev = state;
   state = s;
   endsAt = Date.now() + s.endsIn;
   if (s.state === 'lobby' || s.state === 'choosing' || s.state === 'reveal' || s.state === 'over' || s.state === 'paused') {
@@ -1076,14 +1346,21 @@ socket.on('state', s => {
   }
   if (s.state !== 'choosing') choices = null;
   if (s.state !== 'reveal') turnData = null;
+  if (s.state !== 'over') podiumSig = '';
+  if (s.state !== 'drawing') lastTick = -1;
+  trackPlayers(s);
+  stateSounds(prev, s);
   renderGame();
 });
-socket.on('choices', words => { choices = words; renderOverlays(); });
+socket.on('choices', list => { choices = list; renderOverlays(); });
 socket.on('word', d => { myWord = d.word; hint = null; renderStatus(); updateInput(); });
 socket.on('hint', d => { hint = d.hint; renderStatus(); });
-socket.on('correct', d => addSystem(`You guessed it! +${d.points} points`, true));
+socket.on('correct', d => { addSystem(`You guessed it! +${d.points} points`, true); sfx.play('correct'); });
 socket.on('close', () => addMsg('close', d => (d.textContent = 'So close! Try again.')));
-socket.on('system', d => addSystem(d.text, d.kind === 'good'));
+socket.on('system', d => {
+  addSystem(d.text, d.kind === 'good');
+  if (d.kind === 'good' && d.who && d.who !== playerId) sfx.play('other');
+});
 socket.on('notice', msg => toast(msg));
 socket.on('chat', d => {
   if (muted.has(d.from)) return;
@@ -1120,13 +1397,16 @@ function renderStatus() {
   if (!state) return;
   const el = $('status');
   const isDrawer = state.drawerId === playerId;
+  const rnd = state.round ? `Round ${Math.min(state.round, state.rounds)} of ${state.rounds}` : '';
+  // On phones the round number sits on this small line, since the top bar is slim
+  const tiny = label => `<span class="tiny">${rnd ? `<span class="rnd-part">${rnd} – </span>` : ''}${label}</span>`;
   let html = '';
   switch (state.state) {
     case 'lobby': html = '<span class="stxt">Waiting for players</span>'; break;
-    case 'choosing': html = `<span class="stxt">${isDrawer ? 'Pick a word to draw!' : esc(drawerName()) + ' is choosing a word'}</span>`; break;
+    case 'choosing': html = `${rnd ? tiny('') : ''}<span class="stxt">${isDrawer ? 'Pick a word to draw!' : esc(drawerName()) + ' is choosing a word'}</span>`; break;
     case 'drawing':
-      if (isDrawer) html = `<span class="tiny">Draw this</span><span class="theword">${esc(myWord || '')}</span>`;
-      else if (myWord) html = `<span class="tiny">You guessed it</span><span class="theword">${esc(myWord)}</span>`;
+      if (isDrawer) html = `${tiny('Draw this')}<span class="theword">${esc(myWord || '')}</span>`;
+      else if (myWord) html = `${tiny('You guessed it')}<span class="theword">${esc(myWord)}</span>`;
       else if (hint) {
         let slots = '';
         let letters = 0;
@@ -1134,7 +1414,7 @@ function renderStatus() {
           if (ch === ' ') slots += '<i class="gap"></i>';
           else { slots += `<b class="slot">${ch === '_' ? '' : esc(ch)}</b>`; letters++; }
         });
-        html = `<span class="tiny">Guess this</span><div class="slots">${slots}<span class="len">(${letters})</span></div>`;
+        html = `${tiny('Guess this')}<div class="slots">${slots}<span class="len">(${letters})</span></div>`;
       } else html = '<span class="stxt">Get ready…</span>';
       break;
     case 'reveal': html = '<span class="stxt">Round summary</span>'; break;
@@ -1183,6 +1463,7 @@ function renderPlayers() {
 
 function summaryRows(st) {
   const rows = [
+    ['Words', cap(st.difficulty || 'medium')],
     ['Rounds', st.rounds],
     ['Drawing time', st.drawTime + ' seconds'],
     ['Maximum players', st.maxPlayers],
@@ -1192,12 +1473,73 @@ function summaryRows(st) {
   return rows.map(r => `<span>${esc(r[0])}</span><b>${esc(r[1])}</b>`).join('');
 }
 
-function resultRow(p, i, withGain) {
-  const medals = ['🥇', '🥈', '🥉'];
-  const left = withGain ? '' : `<span style="width:28px;text-align:center">${medals[i] || '#' + (i + 1)}</span>`;
-  const gain = withGain ? `<span class="rg">${p.gained > 0 ? '+' + p.gained : ''}</span>` : '';
-  const total = withGain ? p.total : p.score;
-  return `<div class="res${!withGain && i === 0 ? ' top' : ''}">${left}<span class="ra">${avatarSVG(p.avatar)}</span><span class="rn">${esc(p.name)}</span>${gain}<span class="rt">${total}</span></div>`;
+function resultRow(p) {
+  const gain = `<span class="rg">${p.gained > 0 ? '+' + p.gained : ''}</span>`;
+  return `<div class="res"><span class="ra">${avatarSVG(p.avatar)}</span><span class="rn">${esc(p.name)}</span>${gain}<span class="rt">${p.total}</span></div>`;
+}
+
+/* ----- Winner podium ----- */
+function renderPodium() {
+  const sorted = state.players.slice().sort((a, b) => b.score - a.score);
+  const sig = sorted.map(p => p.id + ':' + p.score).join('|');
+  if (sig === podiumSig) return;
+  const first = podiumSig === '';
+  podiumSig = sig;
+
+  let rank = 0, last = null;
+  const ranked = sorted.map((p, i) => {
+    if (p.score !== last) { rank = i + 1; last = p.score; }
+    return { p, rank };
+  });
+  const top = ranked.slice(0, 3);
+  const winners = ranked.filter(r => r.rank === 1).slice(0, 3).map(r => r.p.name);
+  const anyPoints = ranked.length > 0 && ranked[0].p.score > 0;
+  $('podTitle').textContent = !anyPoints ? 'Game over' : winners.length > 1 ? winners.join(' & ') + ' win!' : winners[0] + ' is the winner!';
+
+  const col = (r, delay) => `<div class="pod-col r${Math.min(r.rank, 3)}" style="--d:${delay}">`
+    + `<div class="pod-av">${avatarSVG(r.p.avatar)}${r.rank === 1 && anyPoints ? CROWN_SVG + TROPHY_SVG : ''}</div>`
+    + `<div class="pod-name">${esc(r.p.name)}</div><div class="pod-pts">${r.p.score} points</div>`
+    + `<div class="pod-block">${r.rank}</div></div>`;
+  // Left to right: 2nd, 1st, 3rd. The third place rises first, the winner last.
+  const slots = [[top[1], '0.75s'], [top[0], '1.35s'], [top[2], '0.2s']];
+  $('podStage').innerHTML = slots.filter(s => s[0]).map(s => col(s[0], s[1])).join('');
+  $('podWrap').classList.toggle('still', !first);
+  $('podRest').innerHTML = ranked.slice(3).map(r => `<div class="pill"><span class="pa">${avatarSVG(r.p.avatar)}</span>#${r.rank} ${esc(r.p.name)} <span class="pp">${r.p.score}</span></div>`).join('');
+  if (first && anyPoints) setTimeout(launchConfetti, 1300);
+}
+
+function launchConfetti() {
+  if (reducedMotion || !state || state.state !== 'over') return;
+  const cv = $('confetti');
+  const ov = $('ovOver');
+  cv.width = ov.clientWidth;
+  cv.height = ov.clientHeight;
+  const c = cv.getContext('2d');
+  const colors = ['#ffd23f', '#ff5d73', '#3aa7ff', '#34c759', '#f15bb5', '#ff9f43', '#9b5de5'];
+  const parts = Array.from({ length: 80 }, () => ({
+    x: Math.random() * cv.width, y: -Math.random() * cv.height * 0.7,
+    w: 6 + Math.random() * 6, h: 8 + Math.random() * 8,
+    vx: (Math.random() - 0.5) * 2, vy: 2 + Math.random() * 3,
+    rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.3,
+    col: colors[Math.floor(Math.random() * colors.length)],
+  }));
+  const start = performance.now();
+  (function frame(t) {
+    const el = t - start;
+    c.clearRect(0, 0, cv.width, cv.height);
+    for (const p of parts) {
+      p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+      if (p.y > cv.height + 20 && el < 3600) p.y = -10;
+      c.save();
+      c.translate(p.x, p.y);
+      c.rotate(p.rot);
+      c.fillStyle = p.col;
+      c.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      c.restore();
+    }
+    if (el < 5400) requestAnimationFrame(frame);
+    else c.clearRect(0, 0, cv.width, cv.height);
+  })(start);
 }
 
 function renderOverlays() {
@@ -1225,11 +1567,20 @@ function renderOverlays() {
   if (s === 'choosing' && isDrawer && choices) {
     const box = $('chooserWords');
     box.innerHTML = '';
-    choices.forEach(w => {
+    const showLevels = state.settings.difficulty === 'mixed';
+    choices.forEach(c => {
       const b = document.createElement('button');
-      b.className = 'btn big';
-      b.textContent = w;
-      b.onclick = () => { socket.emit('choose', w); $('ovChoose').classList.remove('on'); };
+      b.className = 'btn big wbtn';
+      const label = document.createElement('span');
+      label.textContent = c.word;
+      b.appendChild(label);
+      if (showLevels && c.level !== 'custom') {
+        const chip = document.createElement('span');
+        chip.className = 'lvl lvl-' + c.level;
+        chip.textContent = cap(c.level);
+        b.appendChild(chip);
+      }
+      b.onclick = () => { socket.emit('choose', c.word); $('ovChoose').classList.remove('on'); };
       box.appendChild(b);
     });
   }
@@ -1240,11 +1591,13 @@ function renderOverlays() {
   }
   if (s === 'reveal' && turnData) {
     $('turnWord').textContent = turnData.word || '—';
-    $('turnList').innerHTML = turnData.results.map((p, i) => resultRow(p, i, true)).join('');
+    const lvl = turnData.level;
+    $('turnLevel').innerHTML = lvl === 'medium' ? '<span class="lvl lvl-medium">Medium word: +25% points</span>'
+      : lvl === 'hard' ? '<span class="lvl lvl-hard">Hard word: +50% points</span>' : '';
+    $('turnList').innerHTML = turnData.results.map(resultRow).join('');
   }
   if (s === 'over') {
-    const sorted = state.players.slice().sort((a, b) => b.score - a.score);
-    $('overList').innerHTML = sorted.map((p, i) => resultRow(p, i, false)).join('');
+    renderPodium();
     $('overHost').style.display = isHost ? 'flex' : 'none';
     $('overWait').style.display = isHost ? 'none' : 'block';
   }
@@ -1263,9 +1616,10 @@ function updateInput() {
 function renderGame() {
   if (!state) return;
   const isHost = state.owner === playerId;
-  $('roundInfo').textContent = state.round ? `Round ${state.round} of ${state.rounds}` : 'Lobby';
-  $('settingsBtn').style.display = isHost && (state.state === 'lobby' || state.state === 'over') ? '' : 'none';
-  $('lobbySettings').style.display = $('overSettings').style.display = isHost ? '' : 'none';
+  $('roundInfo').textContent = state.round ? `Round ${Math.min(state.round, state.rounds)} of ${state.rounds}` : 'Lobby';
+  $('settingsBtn').classList.toggle('hide', !(isHost && (state.state === 'lobby' || state.state === 'over')));
+  $('lobbySettings').classList.toggle('hide', !isHost);
+  $('overSettings').classList.toggle('hide', !isHost);
   renderStatus();
   renderPlayers();
   renderOverlays();
@@ -1284,6 +1638,10 @@ function updateTimer() {
     const left = Math.max(0, Math.ceil((endsAt - Date.now()) / 1000));
     t.textContent = left;
     t.classList.toggle('low', left <= 10);
+    if (state.state === 'drawing' && left <= 5 && left > 0 && left !== lastTick) {
+      lastTick = left;
+      sfx.play('tick');
+    }
   } else {
     t.textContent = '–';
     t.classList.remove('low');
@@ -1292,7 +1650,7 @@ function updateTimer() {
 setInterval(updateTimer, 250);
 
 /* =====================================================================
-   Player menu: mute, report, vote kick, host kick and ban
+   Menu, sound button, player menu (mute, report, vote kick, kick, ban)
    ===================================================================== */
 function menuButton(label, cls, onClick) {
   const b = document.createElement('button');
@@ -1301,6 +1659,34 @@ function menuButton(label, cls, onClick) {
   b.onclick = onClick;
   return b;
 }
+
+function refreshSoundUI() {
+  $('soundBtn').innerHTML = (sfx.isOn() ? '🔊' : '🔇') + '<span class="lbl"> Sound</span>';
+}
+function toggleSound() {
+  sfx.setOn(!sfx.isOn());
+  refreshSoundUI();
+  if (sfx.isOn()) sfx.play('join');
+}
+$('soundBtn').onclick = toggleSound;
+refreshSoundUI();
+
+function openMenu() {
+  const sheet = $('menuSheet');
+  sheet.innerHTML = '<h2>Menu</h2>';
+  const box = document.createElement('div');
+  box.className = 'pm-btns';
+  const canSettings = state && state.owner === playerId && (state.state === 'lobby' || state.state === 'over');
+  box.appendChild(menuButton('🔗 Invite friends', '', () => { closeModal('mMenu'); invite(); }));
+  if (canSettings) box.appendChild(menuButton('⚙️ Room settings', 'yellow', () => { closeModal('mMenu'); openSettings(); }));
+  box.appendChild(menuButton(sfx.isOn() ? '🔊 Sound: on' : '🔇 Sound: off', 'gray', () => { toggleSound(); openMenu(); }));
+  box.appendChild(menuButton('🚪 Leave room', 'red', () => { closeModal('mMenu'); confirmLeave(); }));
+  box.appendChild(menuButton('Close', 'gray', () => closeModal('mMenu')));
+  sheet.appendChild(box);
+  openModal('mMenu');
+}
+$('menuBtn').onclick = openMenu;
+
 function openPlayerMenu(id) {
   const p = state && state.players.find(x => x.id === id);
   if (!p) return;
@@ -1367,6 +1753,7 @@ function toggleMute(id) {
 function openSettings() {
   if (!state) return;
   const st = state.settings;
+  $('setDiff').value = st.difficulty || 'medium';
   $('setRounds').value = st.rounds;
   $('setTime').value = st.drawTime;
   $('setMax').value = st.maxPlayers;
@@ -1382,6 +1769,7 @@ $('setCancel').onclick = () => closeModal('mSettings');
 $('settingsForm').addEventListener('submit', e => {
   e.preventDefault();
   socket.emit('settings', {
+    difficulty: $('setDiff').value,
     rounds: $('setRounds').value,
     drawTime: $('setTime').value,
     maxPlayers: $('setMax').value,
@@ -1593,7 +1981,7 @@ document.addEventListener('keydown', e => {
   PALETTE.forEach(c => {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'sw' + (c === '#000000' ? '' : '');
+    b.className = 'sw';
     b.style.background = c;
     b.setAttribute('aria-label', 'Color ' + c);
     b.onclick = () => {
@@ -1650,13 +2038,15 @@ function fitCanvas() {
   let availW, availH;
   if (mode === 'portrait') {
     const kb = document.body.classList.contains('kb');
-    const used = ['topbar', 'players', 'tools', 'guessForm'].reduce((sum, id) => sum + $(id).offsetHeight, 0);
+    const short = document.body.classList.contains('short');
+    const used = ['adTop', 'topbar', 'players', 'tools', 'guessForm'].reduce((sum, id) => sum + $(id).offsetHeight, 0);
     const gaps = 30;
-    const minLog = kb ? 30 : 90;
+    // Keep room for the last 3 or 4 chat messages even while the keyboard is open
+    const minLog = kb ? (game.clientHeight < 520 ? 80 : 96) : 90;
     const w = wrap.clientWidth;
     const maxH = game.clientHeight - used - gaps - minLog;
     const needsRoom = state && (state.state === 'lobby' || state.state === 'over');
-    const wanted = needsRoom ? Math.max(w * 0.75, 400) : w * 0.75;
+    const wanted = needsRoom ? Math.max(w * 0.75, state.state === 'over' ? 460 : 400) : w * 0.75;
     const h = Math.max(110, Math.min(wanted, maxH));
     wrap.style.height = h + 'px';
     availW = w;
@@ -1674,19 +2064,23 @@ function fitCanvas() {
 }
 
 let baseH = 0;
+let lastW = 0;
 function updateViewport() {
   const vv = window.visualViewport;
   const vh = vv ? vv.height : window.innerHeight;
   const top = vv ? vv.offsetTop : 0;
   const focused = /^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || '');
+  if (Math.abs(window.innerWidth - lastW) > 80) { baseH = 0; lastW = window.innerWidth; } // the phone was rotated, not a keyboard
   if (!focused || vh > baseH) baseH = vh;
   const kb = focused && coarse.matches && baseH - vh > 100;
   document.body.classList.toggle('kb', kb);
+  document.body.classList.toggle('short', vh < 430);
   const root = document.documentElement.style;
   root.setProperty('--vvh', vh + 'px');
   root.setProperty('--vvt', top + 'px');
   if (top > 0 && !focused) window.scrollTo(0, 0);
   fitCanvas();
+  requestAnimationFrame(() => scrollLog(false)); // keep the newest chat message in view when the keyboard opens
 }
 if (window.visualViewport) {
   window.visualViewport.addEventListener('resize', updateViewport);
