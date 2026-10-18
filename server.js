@@ -11,6 +11,7 @@ const wordLists = require('./words');
 // Settings you may want to change
 // ---------------------------------------------------------------------------
 const PORT = process.env.PORT || 3000;
+const APP_VERSION = '3.2'; // change this whenever you publish a new version; open pages then offer a refresh
 const HARD_MAX_PLAYERS = 8;            // no room can ever hold more than this
 const MAX_ROOMS = 40;                  // protects the free server from overload
 const GRACE_MS = 90 * 1000;            // a disconnected player keeps their seat this long
@@ -41,7 +42,27 @@ const server = http.createServer(app);
 const io = new Server(server, { maxHttpBufferSize: 1e5 }); // 100 KB per message is plenty
 
 app.get('/healthz', (req, res) => res.send('ok'));
-app.use(express.static(path.join(__dirname, 'public')));
+// The page is always re-checked, so players get new versions as soon as they reload
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache');
+  },
+}));
+
+// Voice chat connection helpers. STUN is free and works for most players.
+// For players behind strict networks you can add a TURN relay without changing any code:
+// set TURN_URLS, TURN_USERNAME and TURN_CREDENTIAL in the Render environment settings.
+function iceServers() {
+  const list = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }];
+  if (process.env.TURN_URLS) {
+    list.push({
+      urls: process.env.TURN_URLS.split(',').map(u => u.trim()).filter(Boolean),
+      username: process.env.TURN_USERNAME || '',
+      credential: process.env.TURN_CREDENTIAL || '',
+    });
+  }
+  return list;
+}
 
 const rooms = new Map();
 
@@ -152,7 +173,7 @@ function createRoom(ownerId, isPublic) {
     players: new Map(),
     banned: new Set(),
     tempBans: new Map(),
-    settings: { rounds: 3, drawTime: 60, maxPlayers: HARD_MAX_PLAYERS, difficulty: 'medium', isPublic: !!isPublic, customWords: [], customOnly: false },
+    settings: { rounds: 3, drawTime: 60, maxPlayers: HARD_MAX_PLAYERS, difficulty: 'medium', voice: !isPublic, isPublic: !!isPublic, customWords: [], customOnly: false },
     state: 'lobby', // lobby | choosing | drawing | reveal | paused | over
     round: 0,
     order: [],
@@ -228,6 +249,7 @@ function stateFor(room, forId) {
       drawTime: s.drawTime,
       maxPlayers: s.maxPlayers,
       difficulty: s.difficulty,
+      voice: s.voice,
       isPublic: s.isPublic,
       customOnly: s.customOnly,
       customCount: s.customWords.length,
@@ -536,11 +558,13 @@ const opPoints = op => (op.t === 'f' ? 50 : op.p.length / 2);
 // ---------------------------------------------------------------------------
 io.on('connection', socket => {
   socket.data = {};
+  socket.emit('version', APP_VERSION);
 
   const limits = {
     chat: makeLimiter(1.2, 4),
     draw: makeLimiter(35, 60),
     misc: makeLimiter(3, 12),
+    signal: makeLimiter(40, 150),
   };
 
   const getRoom = () => (socket.data.code ? rooms.get(socket.data.code) : undefined);
@@ -633,7 +657,7 @@ io.on('connection', socket => {
 
     socket.data = { code: room.code, playerId };
     touch(room);
-    socket.emit('joined', { code: room.code, playerId, isOwner: room.owner === playerId });
+    socket.emit('joined', { code: room.code, playerId, isOwner: room.owner === playerId, voice: room.settings.voice, ice: iceServers() });
     sendOps(room, p);
 
     if (room.state === 'paused' && onlinePlayers(room).length >= 2) {
@@ -659,6 +683,7 @@ io.on('connection', socket => {
     s.drawTime = DRAW_TIMES.includes(dt) ? dt : 60;
     s.maxPlayers = clamp(parseInt(d.maxPlayers, 10) || HARD_MAX_PLAYERS, Math.max(2, room.players.size), HARD_MAX_PLAYERS);
     s.difficulty = DIFFICULTIES.includes(d.difficulty) ? d.difficulty : 'medium';
+    s.voice = !!d.voice;
     s.isPublic = !!d.isPublic;
     s.customWords = parseCustomWords(d.customWords);
     s.customOnly = !!d.customOnly && s.customWords.length >= 3;
@@ -774,6 +799,22 @@ io.on('connection', socket => {
     }
 
     broadcast(room, 'chat', { name: me.name, text: msg, from: me.id }, me.id);
+  });
+
+  // ----- Voice chat: the server only passes connection messages between two players.
+  // The voices themselves travel directly between the phones. -----
+  socket.on('rtc-signal', (d = {}) => {
+    if (!limits.signal()) return;
+    const room = getRoom();
+    const me = getMe(room);
+    if (!me || !room.settings.voice) return;
+    const target = room.players.get(String(d.to || ''));
+    if (!target || !target.connected || target.id === me.id) return;
+    const data = d.data;
+    if (!data || typeof data !== 'object') return;
+    if (typeof data.sid !== 'string' || data.sid.length > 40) return;
+    if (!['offer', 'answer', 'candidate'].includes(data.type)) return;
+    io.to(target.socketId).emit('rtc-signal', { from: me.id, data });
   });
 
   // ----- Moderation -----

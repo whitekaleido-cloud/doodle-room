@@ -520,6 +520,9 @@
     .pod-pts { font-size: 11px; margin-bottom: 2px; }
     .pod-title { font-size: 20px; }
     body.kb #game.show { grid-template-rows: auto 0 minmax(0, 1fr); }
+    .vbtn { width: 30px; height: 30px; }
+    .vbtn svg { width: 17px; height: 17px; }
+    #sendBtn { display: none; }
   }
 
   /* ---------- Pop-up windows ---------- */
@@ -589,6 +592,34 @@
     z-index: 90;
   }
   #reconnect.on { display: block; }
+
+  /* Voice chat buttons, speaking ring and the update notice */
+  .vbtn { flex: none; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 10px; background: var(--mist); color: var(--navy); display: grid; place-items: center; cursor: pointer; align-self: center; }
+  .vbtn svg { width: 20px; height: 20px; }
+  .vbtn .slash { display: none; }
+  .vbtn.off { background: #ffd9de; color: #c81e3a; }
+  .vbtn.off .slash { display: block; }
+  .pl.speaking { box-shadow: 0 0 0 3px var(--grass), 0 3px 0 rgba(10, 20, 70, 0.2) !important; }
+  #update {
+    display: none;
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    top: calc(var(--vvt, 0px) + 8px);
+    max-width: 520px;
+    margin: 0 auto;
+    z-index: 120;
+    align-items: center;
+    gap: 10px;
+    background: var(--sun);
+    color: var(--navy);
+    border-radius: 12px;
+    padding: 8px 10px;
+    font-weight: 600;
+    box-shadow: var(--shadow);
+  }
+  #update.on { display: flex; }
+  #update span { flex: 1; }
 
   @media (max-width: 880px) {
     .cards { grid-template-columns: minmax(0, 1fr); max-width: 440px; }
@@ -755,6 +786,12 @@
       <button id="jumpBtn" class="btn sm" type="button">↓ Latest</button>
     </div>
     <form id="guessForm" autocomplete="off">
+      <button id="micBtn" type="button" class="vbtn hide" aria-label="Microphone">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2.5" width="6" height="12" rx="3" fill="currentColor"/><path d="M5 11.5a7 7 0 0014 0M12 18.5V22M8.5 22h7"/><line class="slash" x1="4" y1="4" x2="20" y2="20" stroke="#c81e3a" stroke-width="2.8"/></svg>
+      </button>
+      <button id="spkBtn" type="button" class="vbtn hide" aria-label="Sound from other players">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5l5 4v-13l-5 4z" fill="currentColor"/><path d="M16 9a4 4 0 010 6M18.5 6.5a7.5 7.5 0 010 11"/><line class="slash" x1="4" y1="4" x2="20" y2="20" stroke="#c81e3a" stroke-width="2.8"/></svg>
+      </button>
       <input id="guessInput" class="inp" placeholder="Type your guess here…" maxlength="80" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="send" />
       <button id="sendBtn" type="submit" class="btn sm">Send</button>
     </form>
@@ -784,6 +821,7 @@
       <select id="setMax"></select>
     </label>
     <label class="chk"><input type="checkbox" id="setPublic" /> Public room (shows in the room list)</label>
+    <label class="chk"><input type="checkbox" id="setVoice" /> Voice chat (players can talk to each other)</label>
     <label class="field">Custom words
       <textarea id="setWords" rows="4" placeholder="pizza, rocket, cat in a hat"></textarea>
       <span class="hintline">Separate words with commas or new lines.</span>
@@ -810,6 +848,8 @@
   </div>
 </div>
 
+<div id="update" role="alert"><span>A new version of Doodle Room is ready.</span><button id="updateBtn" class="btn sm green" type="button">Refresh</button></div>
+<div id="audioBox" style="position:fixed;left:-9999px;top:0;width:1px;height:1px;overflow:hidden" aria-hidden="true"></div>
 <div id="toast" role="status"></div>
 <div id="reconnect">Reconnecting…</div>
 
@@ -896,7 +936,10 @@ const sfx = (function () {
   };
 })();
 // Browsers only allow sound after a tap, so the first tap switches it on
-document.addEventListener('pointerdown', () => sfx.unlock());
+document.addEventListener('pointerdown', () => {
+  sfx.unlock();
+  if (typeof voiceKick === 'function') voiceKick();
+});
 document.addEventListener('keydown', () => sfx.unlock());
 
 /* =====================================================================
@@ -997,6 +1040,15 @@ let knownPlayers = null;
 let lastTick = -1;
 let podiumSig = '';
 const muted = new Set();
+
+// If the server has a newer version than this open page, offer a refresh
+const CLIENT_VERSION = '3.2';
+socket.on('version', v => {
+  if (v === CLIENT_VERSION) return;
+  $('update').classList.add('on');
+  if (!inGame) setTimeout(() => location.reload(), 1200);
+});
+$('updateBtn').onclick = () => location.reload();
 
 /* =====================================================================
    Small UI helpers
@@ -1111,6 +1163,7 @@ function setError(msg) { $('lobbyError').textContent = msg || ''; }
 
 function showHome(msg) {
   inGame = false;
+  stopVoice();
   $('game').classList.remove('show');
   $('home').style.display = 'block';
   setError(msg);
@@ -1209,6 +1262,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) return;
   if (inGame) keepAwake();
   checkConnection();
+  voiceRefresh();
 });
 window.addEventListener('pageshow', checkConnection);
 window.addEventListener('online', checkConnection);
@@ -1241,11 +1295,13 @@ socket.on('joined', d => {
     addNote('Welcome! Share the room code or press Invite to bring friends in.');
   }
   muted.forEach(id => socket.emit('mute', { id, on: true }));
+  if (Array.isArray(d.ice) && d.ice.length) iceServers = d.ice;
   const url = '/?room=' + d.code;
   if (!trapped) { history.pushState({ g: 1 }, '', url); trapped = true; }
   else history.replaceState({ g: 1 }, '', url);
   showGame();
   keepAwake();
+  voiceRefresh();
 });
 
 socket.on('joinError', msg => {
@@ -1351,6 +1407,7 @@ socket.on('state', s => {
   trackPlayers(s);
   stateSounds(prev, s);
   renderGame();
+  voiceOnState();
 });
 socket.on('choices', list => { choices = list; renderOverlays(); });
 socket.on('word', d => { myWord = d.word; hint = null; renderStatus(); updateInput(); });
@@ -1446,6 +1503,8 @@ function renderPlayers() {
     el.className = 'pl' + (p.guessed && state.state === 'drawing' ? ' guessed' : '')
       + (p.id === state.drawerId && (state.state === 'drawing' || state.state === 'choosing') ? ' drawer' : '')
       + (!p.connected ? ' offline' : '');
+    el.dataset.id = p.id;
+    if (speakingSet.has(p.id)) el.classList.add('speaking');
     el.innerHTML = `<span class="rank">#${rank}</span><span class="pav">${avatarSVG(p.avatar)}</span>`
       + `<span class="pinfo"><span class="pname">${esc(p.name)}${p.id === playerId ? ' (you)' : ''}</span><span class="pscore">${p.score} points</span></span>`
       + `<span class="pmark">${marksFor(p)}</span>`;
@@ -1468,6 +1527,7 @@ function summaryRows(st) {
     ['Drawing time', st.drawTime + ' seconds'],
     ['Maximum players', st.maxPlayers],
     ['Room type', st.isPublic ? 'Public' : 'Private'],
+    ['Voice chat', st.voice ? 'On' : 'Off'],
   ];
   if (st.customCount > 0) rows.push(['Custom words', st.customCount + (st.customOnly ? ' (only these)' : ' (added)')]);
   return rows.map(r => `<span>${esc(r[0])}</span><b>${esc(r[1])}</b>`).join('');
@@ -1680,6 +1740,10 @@ function openMenu() {
   box.appendChild(menuButton('🔗 Invite friends', '', () => { closeModal('mMenu'); invite(); }));
   if (canSettings) box.appendChild(menuButton('⚙️ Room settings', 'yellow', () => { closeModal('mMenu'); openSettings(); }));
   box.appendChild(menuButton(sfx.isOn() ? '🔊 Sound: on' : '🔇 Sound: off', 'gray', () => { toggleSound(); openMenu(); }));
+  if (voiceEnabledHere()) {
+    box.appendChild(menuButton(micState === 'live' ? '🎤 Microphone: on' : '🎤 Microphone: off', 'gray', () => { closeModal('mMenu'); $('micBtn').click(); }));
+    box.appendChild(menuButton(speakerOn ? '🔊 Hear others: on' : '🔇 Hear others: off', 'gray', () => { closeModal('mMenu'); $('spkBtn').click(); }));
+  }
   box.appendChild(menuButton('🚪 Leave room', 'red', () => { closeModal('mMenu'); confirmLeave(); }));
   box.appendChild(menuButton('Close', 'gray', () => closeModal('mMenu')));
   sheet.appendChild(box);
@@ -1737,7 +1801,8 @@ function toggleMute(id) {
   const on = !muted.has(id);
   if (on) muted.add(id); else muted.delete(id);
   socket.emit('mute', { id, on });
-  toast(on ? 'Muted. You will not see their chat or drawings.' : 'Unmuted.');
+  toast(on ? 'Muted. You will not see or hear them.' : 'Unmuted.');
+  peers.forEach(applyPeerMute);
   if (state) renderPlayers();
 }
 
@@ -1758,6 +1823,7 @@ function openSettings() {
   $('setTime').value = st.drawTime;
   $('setMax').value = st.maxPlayers;
   $('setPublic').checked = st.isPublic;
+  $('setVoice').checked = !!st.voice;
   $('setWords').value = st.customWords || '';
   $('setOnly').checked = st.customOnly;
   openModal('mSettings');
@@ -1774,6 +1840,7 @@ $('settingsForm').addEventListener('submit', e => {
     drawTime: $('setTime').value,
     maxPlayers: $('setMax').value,
     isPublic: $('setPublic').checked,
+    voice: $('setVoice').checked,
     customWords: $('setWords').value,
     customOnly: $('setOnly').checked,
   });
@@ -1782,6 +1849,312 @@ $('settingsForm').addEventListener('submit', e => {
 });
 $('startBtn').onclick = () => socket.emit('start');
 $('againBtn').onclick = () => socket.emit('start');
+
+/* =====================================================================
+   Voice chat: players talk directly to each other (WebRTC).
+   The server only passes the small "connect me to you" messages.
+   ===================================================================== */
+let iceServers = [{ urls: ['stun:stun.l.google.com:19302'] }];
+let voiceActive = false;
+let micState = 'off'; // 'live', 'muted', or 'off' (no microphone available)
+let speakerOn = true;
+let localStream = null;
+let micTrack = null;
+const peers = new Map();
+const lastTry = new Map();
+const pendingPlay = [];
+const levels = new Map();
+let voiceCtx = null;
+let speakingSet = new Set();
+
+const voiceSupported = () => !!window.RTCPeerConnection;
+const voiceEnabledHere = () => !!(state && state.settings && state.settings.voice) && voiceSupported();
+const voiceSid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+const signal = (to, data) => socket.emit('rtc-signal', { to, data });
+
+function renderVoiceUI() {
+  const on = voiceEnabledHere();
+  $('micBtn').classList.toggle('hide', !on);
+  $('spkBtn').classList.toggle('hide', !on);
+  $('micBtn').classList.toggle('off', micState !== 'live');
+  $('spkBtn').classList.toggle('off', !speakerOn);
+  $('micBtn').setAttribute('aria-label', micState === 'live' ? 'Mute microphone' : 'Turn microphone on');
+  $('spkBtn').setAttribute('aria-label', speakerOn ? 'Stop hearing other players' : 'Hear other players');
+  $('micBtn').title = micState === 'live' ? 'Microphone on. Tap to mute' : 'Microphone off. Tap to turn on';
+  $('spkBtn').title = speakerOn ? 'Hearing other players. Tap to turn off' : 'Sound from others is off. Tap to turn on';
+}
+
+function voiceOnState() {
+  if (!state) return;
+  if (voiceEnabledHere() && inGame) {
+    if (!voiceActive) startVoice();
+    else syncPeers();
+  } else if (voiceActive) {
+    stopVoice();
+  }
+  renderVoiceUI();
+}
+
+async function startVoice() {
+  voiceActive = true;
+  renderVoiceUI();
+  syncPeers();
+  if (micState === 'off') await startMic(true); // on by default: the browser asks for permission
+}
+
+function stopVoice() {
+  if (!voiceActive && !localStream && peers.size === 0) { renderVoiceUI(); return; }
+  voiceActive = false;
+  for (const id of [...peers.keys()]) closePeer(id);
+  if (localStream) localStream.getTracks().forEach(t => t.stop());
+  localStream = null;
+  micTrack = null;
+  micState = 'off';
+  for (const id of [...levels.keys()]) stopWatch(id);
+  setSpeaking(new Set());
+  renderVoiceUI();
+}
+
+async function startMic(auto) {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    toast('This browser cannot use the microphone here. You can still hear others.');
+    return false;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    if (!voiceActive) { stream.getTracks().forEach(t => t.stop()); return false; }
+    localStream = stream;
+    micTrack = stream.getAudioTracks()[0];
+    micTrack.onended = () => { micTrack = null; localStream = null; micState = 'off'; renderVoiceUI(); };
+    micState = 'live';
+    peers.forEach(p => { if (p.sender) p.sender.replaceTrack(micTrack).catch(() => {}); });
+    watchLevel(playerId, stream);
+    renderVoiceUI();
+    return true;
+  } catch (e) {
+    micState = 'off';
+    renderVoiceUI();
+    if (e && e.name === 'NotFoundError') toast('No microphone found. You can still hear everyone.');
+    else toast('The microphone is blocked. You can still hear everyone. To talk, allow the microphone in your browser settings.');
+    return false;
+  }
+}
+
+$('micBtn').onclick = async () => {
+  if (!voiceActive) return;
+  if (micState === 'off') {
+    if (await startMic(false)) toast('Microphone on.');
+    return;
+  }
+  const live = micState !== 'live';
+  micTrack.enabled = live;
+  micState = live ? 'live' : 'muted';
+  renderVoiceUI();
+  toast(live ? 'Microphone on.' : 'Microphone muted.');
+};
+$('spkBtn').onclick = () => {
+  speakerOn = !speakerOn;
+  peers.forEach(applyPeerMute);
+  renderVoiceUI();
+  toast(speakerOn ? 'You can hear the other players.' : 'Sound from other players is off.');
+};
+
+function applyPeerMute(peer) {
+  if (peer && peer.audio) peer.audio.muted = !speakerOn || muted.has(peer.id);
+}
+
+/* ----- Connections between players ----- */
+function makePeer(id, sid, answering) {
+  const pc = new RTCPeerConnection({ iceServers });
+  const peer = { id, sid, pc, sender: null, audio: null, pending: [], timer: null };
+  if (!answering) {
+    // The caller adds the audio line. The answering side uses the one it receives (see below).
+    const tr = pc.addTransceiver('audio', { direction: 'sendrecv' });
+    peer.sender = tr.sender;
+    if (micTrack) tr.sender.replaceTrack(micTrack).catch(() => {});
+  }
+  pc.ontrack = e => attachRemote(peer, e.streams && e.streams[0] ? e.streams[0] : new MediaStream([e.track]));
+  pc.onicecandidate = e => {
+    if (e.candidate) signal(id, { sid, type: 'candidate', candidate: e.candidate.toJSON ? e.candidate.toJSON() : e.candidate });
+  };
+  pc.onconnectionstatechange = () => {
+    const st = pc.connectionState;
+    if (st === 'connected') clearTimeout(peer.timer);
+    if (st === 'failed' || st === 'closed') {
+      if (peers.get(id) === peer) { closePeer(id); setTimeout(syncPeers, 3000); }
+    }
+    if (st === 'disconnected') {
+      setTimeout(() => {
+        if (peers.get(id) === peer && pc.connectionState === 'disconnected') { closePeer(id); syncPeers(); }
+      }, 8000);
+    }
+  };
+  // Give up on a connection that never completes. It is retried later.
+  peer.timer = setTimeout(() => {
+    if (peers.get(id) === peer && pc.connectionState !== 'connected') closePeer(id);
+  }, 25000);
+  peers.set(id, peer);
+  return peer;
+}
+
+function closePeer(id) {
+  const peer = peers.get(id);
+  if (!peer) return;
+  peers.delete(id);
+  clearTimeout(peer.timer);
+  try {
+    peer.pc.ontrack = peer.pc.onicecandidate = peer.pc.onconnectionstatechange = null;
+    peer.pc.close();
+  } catch (e) {}
+  if (peer.audio) {
+    try { peer.audio.pause(); peer.audio.srcObject = null; peer.audio.remove(); } catch (e) {}
+  }
+  stopWatch(id);
+}
+
+function attachRemote(peer, stream) {
+  if (!peer.audio) {
+    const a = document.createElement('audio');
+    a.autoplay = true;
+    a.playsInline = true;
+    a.setAttribute('playsinline', '');
+    $('audioBox').appendChild(a);
+    peer.audio = a;
+  }
+  peer.audio.srcObject = stream;
+  applyPeerMute(peer);
+  const played = peer.audio.play();
+  if (played && played.catch) played.catch(() => pendingPlay.push(peer.audio)); // retried on the next tap
+  watchLevel(peer.id, stream);
+}
+
+// Everyone who is online gets a connection. The player with the smaller id makes the call.
+function syncPeers() {
+  if (!voiceActive || !state) return;
+  const want = state.players.filter(p => p.id !== playerId && p.connected);
+  const ids = new Set(want.map(p => p.id));
+  for (const id of [...peers.keys()]) if (!ids.has(id)) closePeer(id);
+  const now = Date.now();
+  for (const p of want) {
+    if (peers.has(p.id) || playerId > p.id) continue;
+    if (now - (lastTry.get(p.id) || 0) < 8000) continue;
+    lastTry.set(p.id, now);
+    callPeer(p.id);
+  }
+}
+
+async function callPeer(id) {
+  const peer = makePeer(id, voiceSid());
+  try {
+    const offer = await peer.pc.createOffer();
+    await peer.pc.setLocalDescription(offer);
+    signal(id, { sid: peer.sid, type: 'offer', sdp: peer.pc.localDescription });
+  } catch (e) { closePeer(id); }
+}
+
+async function flushPending(peer) {
+  for (const c of peer.pending.splice(0)) await peer.pc.addIceCandidate(c).catch(() => {});
+}
+
+socket.on('rtc-signal', async msg => {
+  const from = msg && msg.from;
+  const data = msg && msg.data;
+  if (!voiceActive || !from || !data) return;
+  try {
+    let peer = peers.get(from);
+    if (data.type === 'offer') {
+      if (peer && peer.sid !== data.sid) { closePeer(from); peer = null; }
+      if (!peer) peer = makePeer(from, data.sid, true);
+      await peer.pc.setRemoteDescription(data.sdp);
+      if (!peer.sender) {
+        // Reply with our own voice on the audio line that came with the call
+        const tr = peer.pc.getTransceivers().find(t => t.receiver && t.receiver.track && t.receiver.track.kind === 'audio');
+        if (tr) {
+          tr.direction = 'sendrecv';
+          peer.sender = tr.sender;
+          if (micTrack) tr.sender.replaceTrack(micTrack).catch(() => {});
+        }
+      }
+      await flushPending(peer);
+      const answer = await peer.pc.createAnswer();
+      await peer.pc.setLocalDescription(answer);
+      signal(from, { sid: data.sid, type: 'answer', sdp: peer.pc.localDescription });
+    } else if (!peer || peer.sid !== data.sid) {
+      return;
+    } else if (data.type === 'answer') {
+      await peer.pc.setRemoteDescription(data.sdp);
+      await flushPending(peer);
+    } else if (data.type === 'candidate') {
+      if (peer.pc.remoteDescription) await peer.pc.addIceCandidate(data.candidate).catch(() => {});
+      else peer.pending.push(data.candidate);
+    }
+  } catch (e) { /* a broken connection is retried by syncPeers */ }
+});
+
+// After the phone wakes up, check the microphone and rebuild dead connections
+function voiceRefresh() {
+  if (!voiceActive) return;
+  for (const [id, p] of [...peers]) {
+    const st = p.pc.connectionState;
+    if (st === 'failed' || st === 'closed' || st === 'disconnected') closePeer(id);
+  }
+  if (micTrack && micTrack.readyState === 'ended') { micTrack = null; localStream = null; micState = 'off'; startMic(true); }
+  voiceKick();
+  syncPeers();
+  renderVoiceUI();
+}
+// Browsers only start sound after a tap, so every tap retries the sounds that were waiting
+function voiceKick() {
+  if (voiceCtx && voiceCtx.state === 'suspended') { try { voiceCtx.resume().catch(() => {}); } catch (e) {} }
+  while (pendingPlay.length) { const a = pendingPlay.pop(); try { a.play().catch(() => {}); } catch (e) {} }
+}
+
+/* ----- Green ring around whoever is talking ----- */
+function getVoiceCtx() {
+  if (!voiceCtx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    try { voiceCtx = new AC(); } catch (e) { return null; }
+  }
+  return voiceCtx;
+}
+function watchLevel(id, stream) {
+  stopWatch(id);
+  const c = getVoiceCtx();
+  if (!c) return;
+  try {
+    const src = c.createMediaStreamSource(stream);
+    const an = c.createAnalyser();
+    an.fftSize = 512;
+    src.connect(an); // listening only: never connected to the speakers, so no echo
+    levels.set(id, { src, an, buf: new Uint8Array(an.fftSize) });
+  } catch (e) {}
+}
+function stopWatch(id) {
+  const l = levels.get(id);
+  if (!l) return;
+  try { l.src.disconnect(); } catch (e) {}
+  levels.delete(id);
+}
+function setSpeaking(next) {
+  const changed = next.size !== speakingSet.size || [...next].some(id => !speakingSet.has(id));
+  if (!changed) return;
+  speakingSet = next;
+  document.querySelectorAll('#players .pl').forEach(el => el.classList.toggle('speaking', speakingSet.has(el.dataset.id)));
+}
+setInterval(() => {
+  if (!voiceActive) { if (speakingSet.size) setSpeaking(new Set()); return; }
+  const now = new Set();
+  for (const [id, l] of levels) {
+    if (id === playerId && micState !== 'live') continue;
+    if (id !== playerId && (muted.has(id) || !speakerOn)) continue;
+    l.an.getByteTimeDomainData(l.buf);
+    let sum = 0;
+    for (let i = 0; i < l.buf.length; i++) { const x = (l.buf[i] - 128) / 128; sum += x * x; }
+    if (Math.sqrt(sum / l.buf.length) > 0.035) now.add(id);
+  }
+  setSpeaking(now);
+}, 160);
 
 /* =====================================================================
    Guess box (keeps the keyboard open after sending)
@@ -1796,11 +2169,15 @@ $('guessForm').addEventListener('submit', e => {
   input.focus();
 });
 $('sendBtn').addEventListener('pointerdown', e => e.preventDefault());
+$('micBtn').addEventListener('pointerdown', e => e.preventDefault());
+$('spkBtn').addEventListener('pointerdown', e => e.preventDefault());
 
 /* =====================================================================
    Drawing board
    ===================================================================== */
-const W = 800, H = 600;
+// The board's logical size is 800 x 600. The real bitmap grows with the screen so lines stay sharp.
+let W = 800, H = 600;
+const BASE_W = 800, BASE_H = 600;
 const canvas = $('board');
 canvas.width = W;
 canvas.height = H;
@@ -1874,12 +2251,12 @@ function drawOp(op) {
   const p = op.p;
   ctx.strokeStyle = op.c;
   ctx.fillStyle = op.c;
-  ctx.lineWidth = op.w;
+  ctx.lineWidth = op.w * (W / BASE_W);
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   if (p.length === 2) {
     ctx.beginPath();
-    ctx.arc(p[0] * W, p[1] * H, op.w / 2, 0, Math.PI * 2);
+    ctx.arc(p[0] * W, p[1] * H, (op.w * (W / BASE_W)) / 2, 0, Math.PI * 2);
     ctx.fill();
     return;
   }
@@ -1891,6 +2268,13 @@ function drawOp(op) {
 function redrawAll() {
   clearBoard();
   ops.forEach(drawOp);
+}
+function setResolution(w) {
+  canvas.width = w;
+  canvas.height = Math.round((w * BASE_H) / BASE_W);
+  W = canvas.width;
+  H = canvas.height;
+  redrawAll();
 }
 
 socket.on('draw', op => { ops.push(op); drawOp(op); });
@@ -2057,10 +2441,14 @@ function fitCanvas() {
     availH = wrap.clientHeight;
   }
   const pad = 6;
-  const scale = Math.min((availW - pad * 2) / W, (availH - pad * 2) / H);
-  const cw = Math.max(80, Math.floor(W * scale));
+  const scale = Math.min((availW - pad * 2) / BASE_W, (availH - pad * 2) / BASE_H);
+  const cw = Math.max(80, Math.floor(BASE_W * scale));
   canvas.style.width = cw + 'px';
-  canvas.style.height = Math.floor((cw * H) / W) + 'px';
+  canvas.style.height = Math.floor((cw * BASE_H) / BASE_W) + 'px';
+  // Draw at the screen's real resolution (big monitors and sharp phone screens)
+  const dpr = window.devicePixelRatio || 1;
+  const need = Math.min(1800, Math.max(800, Math.ceil((cw * dpr) / 200) * 200));
+  if (!stroke && (need > canvas.width || need < canvas.width * 0.6)) setResolution(need);
 }
 
 let baseH = 0;
@@ -2096,6 +2484,19 @@ if (window.ResizeObserver) new ResizeObserver(fitCanvas).observe($('game'));
 /* =====================================================================
    Start
    ===================================================================== */
+window.__doodle = {
+  canvas: () => ({ w: canvas.width, h: canvas.height }),
+  version: v => socket.listeners('version').forEach(f => f(v)),
+  voice: async () => {
+    const out = [];
+    for (const [id, p] of peers) {
+      let rx = 0;
+      try { (await p.pc.getStats()).forEach(r => { if (r.type === 'inbound-rtp' && r.kind === 'audio') rx += r.bytesReceived || 0; }); } catch (e) {}
+      out.push({ id: id.slice(0, 6), state: p.pc.connectionState, rx, muted: p.audio ? p.audio.muted : null });
+    }
+    return { active: voiceActive, mic: micState, speaker: speakerOn, peers: out };
+  },
+};
 updateViewport();
 if (urlRoom && urlRoom !== roomCode) {
   roomCode = null;
